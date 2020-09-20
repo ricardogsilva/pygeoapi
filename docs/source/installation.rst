@@ -20,19 +20,16 @@ For developers and the truly impatient
 
 .. code-block:: bash
 
-   python -m venv pygeoapi
-   cd pygeoapi
-   . bin/activate
+   # ensure you already have poetry installed system-wide
    git clone https://github.com/geopython/pygeoapi.git
    cd pygeoapi
-   pip install -r requirements.txt
-   python setup.py install
+   poetry install
    cp pygeoapi-config.yml example-config.yml
    vi example-config.yml
    export PYGEOAPI_CONFIG=example-config.yml
    export PYGEOAPI_OPENAPI=example-openapi.yml
-   pygeoapi generate-openapi-document -c $PYGEOAPI_CONFIG > $PYGEOAPI_OPENAPI
-   pygeoapi serve
+   poetry run pygeoapi generate-openapi-document -c $PYGEOAPI_CONFIG > $PYGEOAPI_OPENAPI
+   poetry run pygeoapi serve
    curl http://localhost:5000
 
 

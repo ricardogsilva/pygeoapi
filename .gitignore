@@ -102,6 +102,7 @@ ENV/
 
 # pygeoapi artifacts
 *.openapi.yml
+my-pygeoapi-config.yml
 
 # misc
 *.swp
@@ -109,6 +110,9 @@ ENV/
 
 #Eclipse project
 .project
+
+#PyCharm project
+.idea
 
 
 .DS_Store

@@ -39,7 +39,7 @@ from flask import Flask, make_response, request, send_from_directory
 from pygeoapi.api import API
 from pygeoapi.util import get_mimetype, yaml_load
 
-APP = Flask(__name__)
+APP = Flask('pygeoapi')
 APP.url_map.strict_slashes = False
 
 CONFIG = None

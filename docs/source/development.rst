@@ -19,8 +19,8 @@ overall API.
 Tests can be run locally as part of development workflow.  They are also run on pygeoapi’s
 `Travis setup`_ against all commits and pull requests to the code repository.
 
-To run all tests, simply run ``pytest`` in the repository.  To run a specific test file,
-run ``pytest tests/test_api.py``, for example.
+To run all tests, simply run ``poetry run pytest`` in the repository.  To run a specific test file,
+run ``poetry run pytest tests/test_api.py``, for example.
 
 
 Working with Spatialite on OSX
