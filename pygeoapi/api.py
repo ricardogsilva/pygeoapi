@@ -39,10 +39,10 @@ import os
 import re
 import urllib.parse
 
-from dateutil.parser import parse as dateparse
 import pytz
+from dateutil.parser import parse as dateparse
+from importlib_metadata import version
 
-from pygeoapi import __version__
 from pygeoapi.linked_data import (geojson2geojsonld, jsonldify,
                                   jsonldify_collection)
 from pygeoapi.log import setup_logger
@@ -64,7 +64,7 @@ LOGGER = logging.getLogger(__name__)
 #: Return headers for requests (e.g:X-Powered-By)
 HEADERS = {
     'Content-Type': 'application/json',
-    'X-Powered-By': 'pygeoapi {}'.format(__version__)
+    'X-Powered-By': 'pygeoapi {}'.format(version('pygeoapi'))
 }
 
 #: Formats allowed for ?f= requests

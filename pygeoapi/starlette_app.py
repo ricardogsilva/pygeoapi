@@ -32,13 +32,10 @@
 
 import os
 
-import click
-
 from starlette.staticfiles import StaticFiles
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import Response
-import uvicorn
 
 from pygeoapi.api import API
 from pygeoapi.util import yaml_load
@@ -426,28 +423,3 @@ async def stac_catalog_path(request: Request):
         response.headers.update(headers)
 
     return response
-
-
-@click.command()
-@click.pass_context
-@click.option('--debug', '-d', default=False, is_flag=True, help='debug')
-def serve(ctx, server=None, debug=False):
-    """
-    Serve pygeoapi via Starlette. Runs pygeoapi
-    as a uvicorn server. Not recommend for production.
-
-    :param server: `string` of server type
-    :param debug: `bool` of whether to run in debug mode
-
-    :returns: void
-    """
-
-#    setup_logger(CONFIG['logging'])
-    uvicorn.run(
-        app, debug=True,
-        host=api_.config['server']['bind']['host'],
-        port=api_.config['server']['bind']['port'])
-
-
-if __name__ == "__main__":  # run locally, for testing
-    serve()

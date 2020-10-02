@@ -38,13 +38,13 @@ import logging
 import mimetypes
 import os
 import re
+from importlib_metadata import version
 from urllib.request import urlopen
 from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader
 import yaml
 
-from pygeoapi import __version__
 from pygeoapi.provider.base import ProviderTypeError
 
 LOGGER = logging.getLogger(__name__)
@@ -242,7 +242,8 @@ def render_j2_template(config, template, data):
     env.globals.update(filter_dict_by_key_value=filter_dict_by_key_value)
 
     template = env.get_template(template)
-    return template.render(config=config, data=data, version=__version__)
+    return template.render(
+        config=config, data=data, version=version('pygeoapi'))
 
 
 def get_mimetype(filename):

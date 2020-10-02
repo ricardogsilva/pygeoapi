@@ -26,34 +26,3 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # =================================================================
-
-__version__ = '0.9.dev0'
-
-import click
-from pygeoapi.openapi import generate_openapi_document
-
-
-cli = click.Group()
-cli.version = __version__
-
-
-@cli.command()
-@click.option('--flask', 'server', flag_value="flask", default=True)
-@click.option('--starlette', 'server', flag_value="starlette")
-@click.pass_context
-def serve(ctx, server):
-    """Run the server with different daemon type (--flask is the default)"""
-
-    if server == "flask":
-        from pygeoapi.flask_app import serve as serve_flask
-        ctx.forward(serve_flask)
-        ctx.invoke(serve_flask)
-    elif server == "starlette":
-        from pygeoapi.starlette_app import serve as serve_starlette
-        ctx.forward(serve_starlette)
-        ctx.invoke(serve_starlette)
-    else:
-        raise click.ClickException('--flask/--starlette is required')
-
-
-cli.add_command(generate_openapi_document)

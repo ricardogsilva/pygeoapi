@@ -32,8 +32,6 @@
 
 import os
 
-import click
-
 from flask import Flask, make_response, request, send_from_directory
 
 from pygeoapi.api import API
@@ -434,26 +432,3 @@ def stac_catalog_path(path):
         response.headers = headers
 
     return response
-
-
-@click.command()
-@click.pass_context
-@click.option('--debug', '-d', default=False, is_flag=True, help='debug')
-def serve(ctx, server=None, debug=False):
-    """
-    Serve pygeoapi via Flask. Runs pygeoapi
-    as a flask server. Not recommend for production.
-
-    :param server: `string` of server type
-    :param debug: `bool` of whether to run in debug mode
-
-    :returns: void
-    """
-
-#    setup_logger(CONFIG['logging'])
-    APP.run(debug=True, host=api_.config['server']['bind']['host'],
-            port=api_.config['server']['bind']['port'])
-
-
-if __name__ == '__main__':  # run locally, for testing
-    serve()
