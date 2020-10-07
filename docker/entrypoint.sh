@@ -2,8 +2,10 @@
 # =================================================================
 #
 # Authors: Just van den Broecke <justb4@gmail.com>
+#          Ricardo Garcia Silva <ricardo.garcia.silva@gmail.com>
 #
 # Copyright (c) 2019 Just van den Broecke
+# Copyright (c) 2020 Ricardo Garcia Silva
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -32,11 +34,13 @@
 
 echo "START /entrypoint.sh"
 
+source ${HOME}/venv/bin/activate
+
 set +e
 
-export PYGEOAPI_HOME=/pygeoapi
-export PYGEOAPI_CONFIG="${PYGEOAPI_HOME}/local.config.yml"
-export PYGEOAPI_OPENAPI="${PYGEOAPI_HOME}/local.openapi.yml"
+export PYGEOAPI_HOME=${HOME}/pygeoapi
+export PYGEOAPI_CONFIG=${HOME}/local.config.yml
+export PYGEOAPI_OPENAPI=${HOME}/local.openapi.yml
 
 # gunicorn env settings with defaults
 SCRIPT_NAME=${SCRIPT_NAME:=/}
@@ -56,11 +60,12 @@ function error() {
 	exit -1
 }
 
+
 # Workdir
 cd ${PYGEOAPI_HOME}
 
 echo "Trying to generate openapi.yml"
-pygeoapi generate-openapi-document -c ${PYGEOAPI_CONFIG} > ${PYGEOAPI_OPENAPI}
+poetry run pygeoapi generate-openapi-document -c ${PYGEOAPI_CONFIG} > ${PYGEOAPI_OPENAPI}
 
 [[ $? -ne 0 ]] && error "openapi.yml could not be generated ERROR"
 
@@ -71,7 +76,7 @@ case ${entry_cmd} in
 	test)
 	  for test_py in $(ls tests/test_*.py)
 	  do
-	    # Skip tests requireing backend server or libs installed
+	    # Skip tests requiring backend server or libs installed
 	    case ${test_py} in
 	        tests/test_elasticsearch__provider.py)
 	        ;&
@@ -81,7 +86,7 @@ case ${entry_cmd} in
 	        	echo "Skipping: ${test_py}"
 	        ;;
 	        *)
-	        	python3 -m pytest ${test_py}
+	        	poetry run pytest ${test_py}
 	         ;;
 	    esac
 	  done
@@ -93,7 +98,7 @@ case ${entry_cmd} in
 		[[ "${SCRIPT_NAME}" = '/' ]] && export SCRIPT_NAME="" && echo "make SCRIPT_NAME empty from /"
 
 		echo "Start gunicorn name=${CONTAINER_NAME} on ${CONTAINER_HOST}:${CONTAINER_PORT} with ${WSGI_WORKERS} workers and SCRIPT_NAME=${SCRIPT_NAME}"
-		gunicorn --workers ${WSGI_WORKERS} \
+		poetry run gunicorn --workers ${WSGI_WORKERS} \
 				--worker-class=${WSGI_WORKER_CLASS} \
 				--timeout ${WSGI_WORKER_TIMEOUT} \
 				--name=${CONTAINER_NAME} \
