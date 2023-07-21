@@ -37,7 +37,30 @@ import click
 from flask import Flask, Blueprint, make_response, request, send_from_directory
 
 from pygeoapi.api import API
+from pygeoapi.request import APIRequest
 from pygeoapi.util import get_mimetype, yaml_load, get_api_rules
+
+
+def adapt_flask_request_to_pygeoapi(func):
+    """Decorator that transforms an incoming Request instance specific to
+    Flask into a generic :class: `APIRequest` instance.
+
+    :param func: decorated function
+
+    :returns: `func`
+    """
+
+    def wrapper(*args, **kwargs):
+        pygeoapi_request = APIRequest.with_data(
+            request, getattr(api_, 'locales', set()))
+        pygeoapi_response = func(pygeoapi_request, *args, **kwargs)
+        headers, status, content = pygeoapi_response
+        response = make_response(content, status)
+        if headers:
+            response.headers = headers
+        return response
+
+    return wrapper
 
 
 if 'PYGEOAPI_CONFIG' not in os.environ:
@@ -104,36 +127,20 @@ if (OGC_SCHEMAS_LOCATION is not None and
                                    mimetype=get_mimetype(basename_))
 
 
-def get_response(result: tuple):
-    """
-    Creates a Flask Response object and updates matching headers.
-
-    :param result: The result of the API call.
-                   This should be a tuple of (headers, status, content).
-
-    :returns: A Response instance.
-    """
-
-    headers, status, content = result
-    response = make_response(content, status)
-
-    if headers:
-        response.headers = headers
-    return response
-
-
 @BLUEPRINT.route('/')
-def landing_page():
+@adapt_flask_request_to_pygeoapi
+def landing_page(pygeoapi_request:APIRequest):
     """
     OGC API landing page endpoint
 
     :returns: HTTP response
     """
-    return get_response(api_.landing_page(request))
+    return api_.landing_page(pygeoapi_request)
 
 
 @BLUEPRINT.route('/openapi')
-def openapi():
+@adapt_flask_request_to_pygeoapi
+def openapi(pygeoapi_request: APIRequest):
     """
     OpenAPI endpoint
 
@@ -144,23 +151,24 @@ def openapi():
             openapi_ = yaml_load(ff)
         else:  # JSON string, do not transform
             openapi_ = ff.read()
-
-    return get_response(api_.openapi(request, openapi_))
+    return api_.openapi(pygeoapi_request, openapi_)
 
 
 @BLUEPRINT.route('/conformance')
-def conformance():
+@adapt_flask_request_to_pygeoapi
+def conformance(pygeoapi_request: APIRequest):
     """
     OGC API conformance endpoint
 
     :returns: HTTP response
     """
-    return get_response(api_.conformance(request))
+    return api_.conformance(pygeoapi_request)
 
 
 @BLUEPRINT.route('/collections')
 @BLUEPRINT.route('/collections/<path:collection_id>')
-def collections(collection_id=None):
+@adapt_flask_request_to_pygeoapi
+def collections(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API collections endpoint
 
@@ -168,11 +176,12 @@ def collections(collection_id=None):
 
     :returns: HTTP response
     """
-    return get_response(api_.describe_collections(request, collection_id))
+    return api_.describe_collections(pygeoapi_request, collection_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/queryables')
-def collection_queryables(collection_id=None):
+@adapt_flask_request_to_pygeoapi
+def collection_queryables(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API collections querybles endpoint
 
@@ -180,7 +189,7 @@ def collection_queryables(collection_id=None):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_queryables(request, collection_id))
+    return api_.get_collection_queryables(pygeoapi_request, collection_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/items',
@@ -189,7 +198,9 @@ def collection_queryables(collection_id=None):
 @BLUEPRINT.route('/collections/<path:collection_id>/items/<path:item_id>',
                  methods=['GET', 'PUT', 'DELETE', 'OPTIONS'],
                  provide_automatic_options=False)
-def collection_items(collection_id, item_id=None):
+@adapt_flask_request_to_pygeoapi
+def collection_items(
+        pygeoapi_request: APIRequest, collection_id, item_id=None):
     """
     OGC API collections items endpoint
 
@@ -199,42 +210,40 @@ def collection_items(collection_id, item_id=None):
     :returns: HTTP response
     """
 
+    pygeoapi_response = None
     if item_id is None:
         if request.method == 'GET':  # list items
-            return get_response(
-                api_.get_collection_items(request, collection_id))
+            pygeoapi_response = api_.get_collection_items(
+                pygeoapi_request, collection_id)
         elif request.method == 'POST':  # filter or manage items
             if request.content_type is not None:
                 if request.content_type == 'application/geo+json':
-                    return get_response(
-                        api_.manage_collection_item(request, 'create',
-                                                    collection_id))
+                    pygeoapi_response = api_.manage_collection_item(
+                        request, 'create', collection_id)
                 else:
-                    return get_response(
-                        api_.post_collection_items(request, collection_id))
+                    pygeoapi_response = api_.post_collection_items(
+                        request, collection_id)
         elif request.method == 'OPTIONS':
-            return get_response(
-                api_.manage_collection_item(request, 'options', collection_id))
-
+            pygeoapi_response = api_.manage_collection_item(
+                request, 'options', collection_id)
     elif request.method == 'DELETE':
-        return get_response(
-            api_.manage_collection_item(request, 'delete',
-                                        collection_id, item_id))
+        pygeoapi_response = api_.manage_collection_item(
+            request, 'delete', collection_id, item_id)
     elif request.method == 'PUT':
-        return get_response(
-            api_.manage_collection_item(request, 'update',
-                                        collection_id, item_id))
+        pygeoapi_response = api_.manage_collection_item(
+            request, 'update', collection_id, item_id)
     elif request.method == 'OPTIONS':
-        return get_response(
-            api_.manage_collection_item(request, 'options',
-                                        collection_id, item_id))
+        pygeoapi_response = api_.manage_collection_item(
+            request, 'options', collection_id, item_id)
     else:
-        return get_response(
-            api_.get_collection_item(request, collection_id, item_id))
+        pygeoapi_response = api_.get_collection_item(
+            request, collection_id, item_id)
+    return pygeoapi_response
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/coverage')
-def collection_coverage(collection_id):
+@adapt_flask_request_to_pygeoapi
+def collection_coverage(pygeoapi_request: APIRequest, collection_id):
     """
     OGC API - Coverages coverage endpoint
 
@@ -242,11 +251,12 @@ def collection_coverage(collection_id):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_coverage(request, collection_id))
+    return api_.get_collection_coverage(pygeoapi_request, collection_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/coverage/domainset')
-def collection_coverage_domainset(collection_id):
+@adapt_flask_request_to_pygeoapi
+def collection_coverage_domainset(pygeoapi_request: APIRequest, collection_id):
     """
     OGC API - Coverages coverage domainset endpoint
 
@@ -254,12 +264,13 @@ def collection_coverage_domainset(collection_id):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_coverage_domainset(
-        request, collection_id))
+    return api_.get_collection_coverage_domainset(
+        pygeoapi_request, collection_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/coverage/rangetype')
-def collection_coverage_rangetype(collection_id):
+@adapt_flask_request_to_pygeoapi
+def collection_coverage_rangetype(pygeoapi_request: APIRequest, collection_id):
     """
     OGC API - Coverages coverage rangetype endpoint
 
@@ -267,12 +278,13 @@ def collection_coverage_rangetype(collection_id):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_coverage_rangetype(
-        request, collection_id))
+    return api_.get_collection_coverage_rangetype(
+        pygeoapi_request, collection_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/tiles')
-def get_collection_tiles(collection_id=None):
+@adapt_flask_request_to_pygeoapi
+def get_collection_tiles(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC open api collections tiles access point
 
@@ -280,13 +292,14 @@ def get_collection_tiles(collection_id=None):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_tiles(
-        request, collection_id))
+    return api_.get_collection_tiles(pygeoapi_request, collection_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/tiles/<tileMatrixSetId>')
 @BLUEPRINT.route('/collections/<path:collection_id>/tiles/<tileMatrixSetId>/metadata')  # noqa
-def get_collection_tiles_metadata(collection_id=None, tileMatrixSetId=None):
+@adapt_flask_request_to_pygeoapi
+def get_collection_tiles_metadata(
+        pygeoapi_request: APIRequest, collection_id=None, tileMatrixSetId=None):
     """
     OGC open api collection tiles service metadata
 
@@ -295,14 +308,21 @@ def get_collection_tiles_metadata(collection_id=None, tileMatrixSetId=None):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_tiles_metadata(
-        request, collection_id, tileMatrixSetId))
+    return api_.get_collection_tiles_metadata(
+        pygeoapi_request, collection_id, tileMatrixSetId)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/tiles/\
 <tileMatrixSetId>/<tileMatrix>/<tileRow>/<tileCol>')
-def get_collection_tiles_data(collection_id=None, tileMatrixSetId=None,
-                              tileMatrix=None, tileRow=None, tileCol=None):
+@adapt_flask_request_to_pygeoapi
+def get_collection_tiles_data(
+        pygeoapi_request: APIRequest,
+        collection_id=None,
+        tileMatrixSetId=None,
+        tileMatrix=None,
+        tileRow=None,
+        tileCol=None
+):
     """
     OGC open api collection tiles service data
 
@@ -314,13 +334,16 @@ def get_collection_tiles_data(collection_id=None, tileMatrixSetId=None,
 
     :returns: HTTP response
     """
-    return get_response(api_.get_collection_tiles_data(
-        request, collection_id, tileMatrixSetId, tileMatrix, tileRow, tileCol))
+    return api_.get_collection_tiles_data(
+        pygeoapi_request, collection_id, tileMatrixSetId,
+        tileMatrix, tileRow, tileCol
+    )
 
 
 @BLUEPRINT.route('/collections/<collection_id>/map')
 @BLUEPRINT.route('/collections/<collection_id>/styles/<style_id>/map')
-def collection_map(collection_id, style_id=None):
+@adapt_flask_request_to_pygeoapi
+def collection_map(pygeoapi_request: APIRequest, collection_id, style_id=None):
     """
     OGC API - Maps map render endpoint
 
@@ -330,20 +353,13 @@ def collection_map(collection_id, style_id=None):
     :returns: HTTP response
     """
 
-    headers, status_code, content = api_.get_collection_map(
-        request, collection_id, style_id)
-
-    response = make_response(content, status_code)
-
-    if headers:
-        response.headers = headers
-
-    return response
+    return api_.get_collection_map(pygeoapi_request, collection_id, style_id)
 
 
 @BLUEPRINT.route('/processes')
 @BLUEPRINT.route('/processes/<process_id>')
-def get_processes(process_id=None):
+@adapt_flask_request_to_pygeoapi
+def get_processes(pygeoapi_request: APIRequest, process_id=None):
     """
     OGC API - Processes description endpoint
 
@@ -351,13 +367,14 @@ def get_processes(process_id=None):
 
     :returns: HTTP response
     """
-    return get_response(api_.describe_processes(request, process_id))
+    return api_.describe_processes(pygeoapi_request, process_id)
 
 
 @BLUEPRINT.route('/jobs')
 @BLUEPRINT.route('/jobs/<job_id>',
                  methods=['GET', 'DELETE'])
-def get_jobs(job_id=None):
+@adapt_flask_request_to_pygeoapi
+def get_jobs(pygeoapi_request: APIRequest, job_id=None):
     """
     OGC API - Processes jobs endpoint
 
@@ -365,18 +382,19 @@ def get_jobs(job_id=None):
 
     :returns: HTTP response
     """
-
     if job_id is None:
-        return get_response(api_.get_jobs(request))
+        pygeoapi_response = api_.get_jobs(pygeoapi_request)
     else:
         if request.method == 'DELETE':  # dismiss job
-            return get_response(api_.delete_job(request, job_id))
+            pygeoapi_response = api_.delete_job(pygeoapi_request, job_id)
         else:  # Return status of a specific job
-            return get_response(api_.get_jobs(request, job_id))
+            pygeoapi_response = api_.get_jobs(request, job_id)
+    return pygeoapi_response
 
 
 @BLUEPRINT.route('/processes/<process_id>/execution', methods=['POST'])
-def execute_process_jobs(process_id):
+@adapt_flask_request_to_pygeoapi
+def execute_process_jobs(pygeoapi_request: APIRequest, process_id):
     """
     OGC API - Processes execution endpoint
 
@@ -384,13 +402,13 @@ def execute_process_jobs(process_id):
 
     :returns: HTTP response
     """
-
-    return get_response(api_.execute_process(request, process_id))
+    return api_.execute_process(pygeoapi_request, process_id)
 
 
 @BLUEPRINT.route('/jobs/<job_id>/results',
                  methods=['GET'])
-def get_job_result(job_id=None):
+@adapt_flask_request_to_pygeoapi
+def get_job_result(pygeoapi_request: APIRequest, job_id=None):
     """
     OGC API - Processes job result endpoint
 
@@ -398,22 +416,7 @@ def get_job_result(job_id=None):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_job_result(request, job_id))
-
-
-@BLUEPRINT.route('/jobs/<job_id>/results/<resource>',
-                 methods=['GET'])
-def get_job_result_resource(job_id, resource):
-    """
-    OGC API - Processes job result resource endpoint
-
-    :param job_id: job identifier
-    :param resource: job resource
-
-    :returns: HTTP response
-    """
-    return get_response(api_.get_job_result_resource(
-        request, job_id, resource))
+    return api_.get_job_result(pygeoapi_request, job_id)
 
 
 @BLUEPRINT.route('/collections/<path:collection_id>/position')
@@ -428,7 +431,9 @@ def get_job_result_resource(job_id, resource):
 @BLUEPRINT.route('/collections/<path:collection_id>/instances/<instance_id>/radius')  # noqa
 @BLUEPRINT.route('/collections/<path:collection_id>/instances/<instance_id>/trajectory')  # noqa
 @BLUEPRINT.route('/collections/<path:collection_id>/instances/<instance_id>/corridor')  # noqa
-def get_collection_edr_query(collection_id, instance_id=None):
+@adapt_flask_request_to_pygeoapi
+def get_collection_edr_query(
+        pygeoapi_request: APIRequest, collection_id, instance_id=None):
     """
     OGC EDR API endpoints
 
@@ -438,22 +443,24 @@ def get_collection_edr_query(collection_id, instance_id=None):
     :returns: HTTP response
     """
     query_type = request.path.split('/')[-1]
-    return get_response(api_.get_collection_edr_query(request, collection_id,
-                                                      instance_id, query_type))
+    return api_.get_collection_edr_query(
+        pygeoapi_request, collection_id, instance_id, query_type)
 
 
 @BLUEPRINT.route('/stac')
-def stac_catalog_root():
+@adapt_flask_request_to_pygeoapi
+def stac_catalog_root(pygeoapi_request: APIRequest):
     """
     STAC root endpoint
 
     :returns: HTTP response
     """
-    return get_response(api_.get_stac_root(request))
+    return api_.get_stac_root(pygeoapi_request)
 
 
 @BLUEPRINT.route('/stac/<path:path>')
-def stac_catalog_path(path):
+@adapt_flask_request_to_pygeoapi
+def stac_catalog_path(pygeoapi_request: APIRequest, path):
     """
     STAC path endpoint
 
@@ -461,7 +468,7 @@ def stac_catalog_path(path):
 
     :returns: HTTP response
     """
-    return get_response(api_.get_stac_path(request, path))
+    return api_.get_stac_path(pygeoapi_request, path)
 
 
 APP.register_blueprint(BLUEPRINT)
