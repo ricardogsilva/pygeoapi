@@ -40,8 +40,9 @@ from tinydb import TinyDB, Query
 
 import pytest
 from pygeoapi.api import (
-    API, APIRequest
+    API
 )
+from pygeoapi.request import APIRequest
 from pygeoapi.util import yaml_load
 
 from .util import get_test_file_path
