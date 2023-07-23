@@ -35,8 +35,8 @@ import pytest
 from pyproj.exceptions import CRSError
 from shapely.geometry import Point
 
+from pygeoapi import __version__
 from pygeoapi import util
-from pygeoapi.api import __version__
 from pygeoapi.provider.base import ProviderTypeError
 
 from .util import get_test_file_path

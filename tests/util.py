@@ -40,6 +40,8 @@ from werkzeug.test import create_environ
 from werkzeug.wrappers import Request
 from werkzeug.datastructures import ImmutableMultiDict
 
+from pygeoapi.request import APIRequest
+
 LOGGER = logging.getLogger(__name__)
 
 
