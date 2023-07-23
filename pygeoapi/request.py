@@ -49,74 +49,13 @@ class APIRequest:
     Transforms an incoming server-specific Request into an object
     with some generic helper methods and properties.
 
-    .. note::   Typically, this instance is created automatically by the
-                :func:`pre_process` decorator. **Every** API method that has
-                been routed to a REST endpoint should be decorated by the
-                :func:`pre_process` function.
-                Therefore, **all** routed API methods should at least have 1
-                argument that holds the (transformed) request.
-
-    The following example API method will:
-
-    - transform the incoming Flask/Starlette/Django `Request` into an
-      `APIRequest`using the :func:`pre_process` decorator;
-    - call :meth:`is_valid` to check if the incoming request was valid, i.e.
-      that the user requested a valid output format or no format at all
-      (which means the default format);
-    - call :meth:`API.get_format_exception` if the requested format was
-      invalid;
-    - create a `dict` with the appropriate `Content-Type` header for the
-      requested format and a `Content-Language` header if any specific language
-      was requested.
-
-    .. code-block:: python
-
-       @pre_process
-       def example_method(self, request: Union[APIRequest, Any], custom_arg):
-          if not request.is_valid():
-             return self.get_format_exception(request)
-
-          headers = request.get_response_headers()
-
-          # generate response_body here
-
-          return headers, HTTPStatus.OK, response_body
-
-
-    The following example API method is similar as the one above, but will also
-    allow the user to request a non-standard format (e.g. ``f=xml``).
-    If `xml` was requested, we set the `Content-Type` ourselves. For the
-    standard formats, the `APIRequest` object sets the `Content-Type`.
-
-    .. code-block:: python
-
-       @pre_process
-       def example_method(self, request: Union[APIRequest, Any], custom_arg):
-          if not request.is_valid(['xml']):
-             return self.get_format_exception(request)
-
-          content_type = 'application/xml' if request.format == 'xml' else None
-          headers = request.get_response_headers(content_type)
-
-          # generate response_body here
-
-          return headers, HTTPStatus.OK, response_body
-
-    Note that you don't *have* to call :meth:`is_valid`, but that you can also
-    perform a custom check on the requested output format by looking at the
-    :attr:`format` property.
-    Other query parameters are available through the :attr:`params` property as
-    a `dict`. The request body is available through the :attr:`data` property.
-
-    .. note::   If the request data (body) is important, **always** create a
-                new `APIRequest` instance using the :meth:`with_data` factory
-                method.
-                The :func:`pre_process` decorator will use this automatically.
-
     :param request:             The web platform specific Request instance.
     :param supported_locales:   List or set of supported Locale instances.
     """
+    method: str
+
     def __init__(self, request, supported_locales):
+        self.method = self.get_method(request)
         # Set default request data
         self._data = b''
 
@@ -204,6 +143,11 @@ class APIRequest:
             return request.POST
         LOGGER.debug('No query parameters found')
         return {}
+
+    @staticmethod
+    def get_method(request) -> str:
+        # presentin both flask, starlette and django request instances
+        return request.method
 
     def _get_locale(self, headers, supported_locales):
         """

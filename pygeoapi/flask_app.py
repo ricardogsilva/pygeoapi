@@ -2,8 +2,10 @@
 #
 # Authors: Tom Kralidis <tomkralidis@gmail.com>
 #          Norman Barker <norman.barker@gmail.com>
+#          Ricardo Garcia Silva <ricardo.garcia.silva@geobeyond.it>
 #
 # Copyright (c) 2022 Tom Kralidis
+# Copyright (c) 2023 Ricardo Garcia Silva
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -30,6 +32,7 @@
 
 """Flask module providing the route paths to the api"""
 
+from functools import wraps
 import os
 
 import click
@@ -42,14 +45,26 @@ from pygeoapi.util import get_mimetype, yaml_load, get_api_rules
 
 
 def adapt_flask_request_to_pygeoapi(func):
-    """Decorator that transforms an incoming Request instance specific to
-    Flask into a generic :class: `APIRequest` instance.
+    """Decorator that adapts Flask requests and generates responses.
 
     :param func: decorated function
 
     :returns: `func`
+
+    This function must be used as a decorator on all flask routes. It
+    performs the following steps:
+
+    1. Transforms incoming flask Request instance into an :class:
+       `APIRequest` instance;
+    2. Proceeds to execute whatever code is defined in the decorated function
+    3. Uses the generated response, which is expected to be a standard
+       pygeoapi API response (consisting of a three-element tuple of a
+       dictionary with response headers, an integer with the HTTP status code
+       and the response body content) to generate a suitable flask Response
+       instance
     """
 
+    @wraps(func)
     def wrapper(*args, **kwargs):
         pygeoapi_request = APIRequest.with_data(
             request, getattr(api_, 'locales', set()))
@@ -129,9 +144,11 @@ if (OGC_SCHEMAS_LOCATION is not None and
 
 @BLUEPRINT.route('/')
 @adapt_flask_request_to_pygeoapi
-def landing_page(pygeoapi_request:APIRequest):
+def landing_page(pygeoapi_request: APIRequest):
     """
     OGC API landing page endpoint
+
+    :param pygeoapi_request: pygeoapi's APIRequest instance
 
     :returns: HTTP response
     """
@@ -144,6 +161,7 @@ def openapi(pygeoapi_request: APIRequest):
     """
     OpenAPI endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :returns: HTTP response
     """
     with open(os.environ.get('PYGEOAPI_OPENAPI'), encoding='utf8') as ff:
@@ -172,6 +190,7 @@ def collections(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API collections endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: HTTP response
@@ -185,6 +204,7 @@ def collection_queryables(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API collections querybles endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: HTTP response
@@ -204,6 +224,7 @@ def collection_items(
     """
     OGC API collections items endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param item_id: item identifier
 
@@ -212,32 +233,33 @@ def collection_items(
 
     pygeoapi_response = None
     if item_id is None:
-        if request.method == 'GET':  # list items
+        if pygeoapi_request.method == 'GET':  # list items
             pygeoapi_response = api_.get_collection_items(
                 pygeoapi_request, collection_id)
-        elif request.method == 'POST':  # filter or manage items
-            if request.content_type is not None:
-                if request.content_type == 'application/geo+json':
+        elif pygeoapi_request.method == 'POST':  # filter or manage items
+            content_type = pygeoapi_request.headers.get("Content-Type")
+            if content_type is not None:
+                if content_type == 'application/geo+json':
                     pygeoapi_response = api_.manage_collection_item(
-                        request, 'create', collection_id)
+                        pygeoapi_request, 'create', collection_id)
                 else:
                     pygeoapi_response = api_.post_collection_items(
-                        request, collection_id)
-        elif request.method == 'OPTIONS':
+                        pygeoapi_request, collection_id)
+        elif pygeoapi_request.method == 'OPTIONS':
             pygeoapi_response = api_.manage_collection_item(
-                request, 'options', collection_id)
-    elif request.method == 'DELETE':
+                pygeoapi_request, 'options', collection_id)
+    elif pygeoapi_request.method == 'DELETE':
         pygeoapi_response = api_.manage_collection_item(
-            request, 'delete', collection_id, item_id)
-    elif request.method == 'PUT':
+            pygeoapi_request, 'delete', collection_id, item_id)
+    elif pygeoapi_request.method == 'PUT':
         pygeoapi_response = api_.manage_collection_item(
-            request, 'update', collection_id, item_id)
-    elif request.method == 'OPTIONS':
+            pygeoapi_request, 'update', collection_id, item_id)
+    elif pygeoapi_request.method == 'OPTIONS':
         pygeoapi_response = api_.manage_collection_item(
-            request, 'options', collection_id, item_id)
+            pygeoapi_request, 'options', collection_id, item_id)
     else:
         pygeoapi_response = api_.get_collection_item(
-            request, collection_id, item_id)
+            pygeoapi_request, collection_id, item_id)
     return pygeoapi_response
 
 
@@ -247,6 +269,7 @@ def collection_coverage(pygeoapi_request: APIRequest, collection_id):
     """
     OGC API - Coverages coverage endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: HTTP response
@@ -260,6 +283,7 @@ def collection_coverage_domainset(pygeoapi_request: APIRequest, collection_id):
     """
     OGC API - Coverages coverage domainset endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: HTTP response
@@ -274,6 +298,7 @@ def collection_coverage_rangetype(pygeoapi_request: APIRequest, collection_id):
     """
     OGC API - Coverages coverage rangetype endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: HTTP response
@@ -288,6 +313,7 @@ def get_collection_tiles(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC open api collections tiles access point
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: HTTP response
@@ -299,10 +325,14 @@ def get_collection_tiles(pygeoapi_request: APIRequest, collection_id=None):
 @BLUEPRINT.route('/collections/<path:collection_id>/tiles/<tileMatrixSetId>/metadata')  # noqa
 @adapt_flask_request_to_pygeoapi
 def get_collection_tiles_metadata(
-        pygeoapi_request: APIRequest, collection_id=None, tileMatrixSetId=None):
+        pygeoapi_request: APIRequest,
+        collection_id=None,
+        tileMatrixSetId=None
+):
     """
     OGC open api collection tiles service metadata
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param tileMatrixSetId: identifier of tile matrix set
 
@@ -326,6 +356,7 @@ def get_collection_tiles_data(
     """
     OGC open api collection tiles service data
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param tileMatrixSetId: identifier of tile matrix set
     :param tileMatrix: identifier of {z} matrix index
@@ -347,6 +378,7 @@ def collection_map(pygeoapi_request: APIRequest, collection_id, style_id=None):
     """
     OGC API - Maps map render endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param style_id: style identifier
 
@@ -363,6 +395,7 @@ def get_processes(pygeoapi_request: APIRequest, process_id=None):
     """
     OGC API - Processes description endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param process_id: process identifier
 
     :returns: HTTP response
@@ -378,6 +411,7 @@ def get_jobs(pygeoapi_request: APIRequest, job_id=None):
     """
     OGC API - Processes jobs endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param job_id: job identifier
 
     :returns: HTTP response
@@ -385,10 +419,10 @@ def get_jobs(pygeoapi_request: APIRequest, job_id=None):
     if job_id is None:
         pygeoapi_response = api_.get_jobs(pygeoapi_request)
     else:
-        if request.method == 'DELETE':  # dismiss job
+        if pygeoapi_request.method == 'DELETE':  # dismiss job
             pygeoapi_response = api_.delete_job(pygeoapi_request, job_id)
         else:  # Return status of a specific job
-            pygeoapi_response = api_.get_jobs(request, job_id)
+            pygeoapi_response = api_.get_jobs(pygeoapi_request, job_id)
     return pygeoapi_response
 
 
@@ -398,6 +432,7 @@ def execute_process_jobs(pygeoapi_request: APIRequest, process_id):
     """
     OGC API - Processes execution endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param process_id: process identifier
 
     :returns: HTTP response
@@ -412,6 +447,7 @@ def get_job_result(pygeoapi_request: APIRequest, job_id=None):
     """
     OGC API - Processes job result endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param job_id: job identifier
 
     :returns: HTTP response
@@ -437,12 +473,13 @@ def get_collection_edr_query(
     """
     OGC EDR API endpoints
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param instance_id: instance identifier
 
     :returns: HTTP response
     """
-    query_type = request.path.split('/')[-1]
+    query_type = pygeoapi_request.path_info.split('/')[-1]
     return api_.get_collection_edr_query(
         pygeoapi_request, collection_id, instance_id, query_type)
 
@@ -464,6 +501,7 @@ def stac_catalog_path(pygeoapi_request: APIRequest, path):
     """
     STAC path endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param path: path
 
     :returns: HTTP response

@@ -3,10 +3,12 @@
 # Authors: Francesco Bartoli <xbartolone@gmail.com>
 #          Tom Kralidis <tomkralidis@gmail.com>
 #          Abdulazeez Abdulazeez Adeshina <youngestdev@gmail.com>
+#          Ricardo Garcia Silva <ricardo.garcia.silva@geobeyond.it>
 #
 # Copyright (c) 2020 Francesco Bartoli
 # Copyright (c) 2022 Tom Kralidis
 # Copyright (c) 2022 Abdulazeez Abdulazeez Adeshina
+# Copyright (c) 2023 Ricardo Garcia Silva
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -32,8 +34,9 @@
 # =================================================================
 """ Starlette module providing the route paths to the api"""
 
+from functools import wraps
+import logging
 import os
-from typing import Union
 from pathlib import Path
 
 import click
@@ -50,7 +53,10 @@ from starlette.responses import (
 import uvicorn
 
 from pygeoapi.api import API
+from pygeoapi.request import APIRequest
 from pygeoapi.util import yaml_load, get_api_rules
+
+LOGGER = logging.getLogger(__name__)
 
 if 'PYGEOAPI_CONFIG' not in os.environ:
     raise RuntimeError('PYGEOAPI_CONFIG environment variable not set')
@@ -73,46 +79,68 @@ API_RULES = get_api_rules(CONFIG)
 api_ = API(CONFIG)
 
 
-def get_response(result: tuple) -> Union[Response, JSONResponse, HTMLResponse]:
+def adapt_starlette_request_to_pygeoapi(func):
+    """Decorator that adapts Starlette requests and generates responses.
+
+    :param func: decorated function
+
+    :returns: `func`
+
+    This function must be used as a decorator on all Starlette routes. It
+    performs the following steps:
+
+    1. Transforms incoming flask Request instance into an :class:
+        `APIRequest` instance;
+    2. Proceeds to execute whatever code is defined in the decorated function
+    3. Uses the generated response, which is expected to be a standard
+    pygeoapi API response (consisting of a three-element tuple of a
+    dictionary with response headers, an integer with the HTTP status code
+    and the response body content) to generate a suitable flask Response
+    instance
     """
-    Creates a Starlette Response object and updates matching headers.
 
-    :param result: The result of the API call.
-                   This should be a tuple of (headers, status, content).
-
-    :returns: A Response instance.
-    """
-
-    headers, status, content = result
-    if headers['Content-Type'] == 'text/html':
-        response = HTMLResponse(content=content, status_code=status)
-    else:
-        if isinstance(content, dict):
-            response = JSONResponse(content, status_code=status)
+    @wraps(func)
+    async def wrapper(request: Request, *args, **kwargs):
+        pygeoapi_request = APIRequest.with_data(
+            request, getattr(api_, 'locales', set()))
+        kwargs = {
+            **kwargs,
+            **request.path_params,
+        }
+        pygeoapi_response = await func(pygeoapi_request, *args, **kwargs)
+        headers, status, content = pygeoapi_response
+        if headers['Content-Type'] == 'text/html':
+            response = HTMLResponse(content=content, status_code=status)
         else:
-            response = Response(content, status_code=status)
+            if isinstance(content, dict):
+                response = JSONResponse(content, status_code=status)
+            else:
+                response = Response(content, status_code=status)
+        if headers is not None:
+            response.headers.update(headers)
+        return response
 
-    if headers is not None:
-        response.headers.update(headers)
-    return response
+    return wrapper
 
 
-async def landing_page(request: Request):
+@adapt_starlette_request_to_pygeoapi
+async def landing_page(pygeoapi_request: APIRequest):
     """
     OGC API landing page endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
 
     :returns: Starlette HTTP Response
     """
-    return get_response(api_.landing_page(request))
+    return api_.landing_page(pygeoapi_request)
 
 
-async def openapi(request: Request):
+@adapt_starlette_request_to_pygeoapi
+async def openapi(pygeoapi_request: APIRequest):
     """
     OpenAPI endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
 
     :returns: Starlette HTTP Response
     """
@@ -122,74 +150,81 @@ async def openapi(request: Request):
         else:  # JSON file, do not transform
             openapi_ = ff
 
-    return get_response(api_.openapi(request, openapi_))
+    return api_.openapi(pygeoapi_request, openapi_)
 
 
-async def conformance(request: Request):
+@adapt_starlette_request_to_pygeoapi
+async def conformance(pygeoapi_request: APIRequest):
     """
     OGC API conformance endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
 
     :returns: Starlette HTTP Response
     """
-    return get_response(api_.conformance(request))
+    return api_.conformance(pygeoapi_request)
 
 
-async def collection_queryables(request: Request, collection_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collection_queryables(
+        pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API collections queryables endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: Starlette HTTP Response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    return get_response(api_.get_collection_queryables(request, collection_id))
+    return api_.get_collection_queryables(pygeoapi_request, collection_id)
 
 
-async def get_collection_tiles(request: Request, collection_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_collection_tiles(
+        pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC open api collections tiles access point
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: Starlette HTTP Response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    return get_response(api_.get_collection_tiles(
-        request, collection_id))
+    return api_.get_collection_tiles(pygeoapi_request, collection_id)
 
 
-async def get_collection_tiles_metadata(request: Request, collection_id=None,
-                                        tileMatrixSetId=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_collection_tiles_metadata(
+        pygeoapi_request: APIRequest,
+        collection_id=None,
+        tileMatrixSetId=None
+):
     """
     OGC open api collection tiles service metadata
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param tileMatrixSetId: identifier of tile matrix set
 
     :returns: HTTP response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    if 'tileMatrixSetId' in request.path_params:
-        tileMatrixSetId = request.path_params['tileMatrixSetId']
-    return get_response(api_.get_collection_tiles_metadata(
-        request, collection_id, tileMatrixSetId))
+    return api_.get_collection_tiles_metadata(
+        pygeoapi_request, collection_id, tileMatrixSetId)
 
 
-async def get_collection_items_tiles(request: Request, collection_id=None,
-                                     tileMatrixSetId=None, tile_matrix=None,
-                                     tileRow=None, tileCol=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_collection_items_tiles(
+        pygeoapi_request: APIRequest,
+        collection_id=None,
+        tileMatrixSetId=None,
+        tile_matrix=None,
+        tileRow=None,
+        tileCol=None
+):
     """
     OGC open api collection tiles service
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param tileMatrixSetId: identifier of tile matrix set
     :param tile_matrix: identifier of {z} matrix index
@@ -198,285 +233,251 @@ async def get_collection_items_tiles(request: Request, collection_id=None,
 
     :returns: HTTP response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    if 'tileMatrixSetId' in request.path_params:
-        tileMatrixSetId = request.path_params['tileMatrixSetId']
-    if 'tile_matrix' in request.path_params:
-        tile_matrix = request.path_params['tile_matrix']
-    if 'tileRow' in request.path_params:
-        tileRow = request.path_params['tileRow']
-    if 'tileCol' in request.path_params:
-        tileCol = request.path_params['tileCol']
-    return get_response(api_.get_collection_tiles_data(
-        request, collection_id, tileMatrixSetId,
-        tile_matrix, tileRow, tileCol))
+    return api_.get_collection_tiles_data(
+        pygeoapi_request, collection_id, tileMatrixSetId,
+        tile_matrix, tileRow, tileCol
+    )
 
 
-async def collection_items(request: Request, collection_id=None, item_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collection_items(
+        pygeoapi_request: APIRequest, collection_id=None, item_id=None):
     """
     OGC API collections items endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param item_id: item identifier
 
     :returns: Starlette HTTP Response
     """
 
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    if 'item_id' in request.path_params:
-        item_id = request.path_params['item_id']
+    pygeoapi_response = None
     if item_id is None:
-        if request.method == 'GET':  # list items
-            return get_response(
-                api_.get_collection_items(
-                    request, collection_id))
-        elif request.method == 'POST':  # filter or manage items
-            content_type = request.headers.get('content-type')
+        if pygeoapi_request.method == 'GET':  # list items
+            pygeoapi_response = api_.get_collection_items(
+                pygeoapi_request, collection_id)
+        elif pygeoapi_request.method == 'POST':  # filter or manage items
+            content_type = pygeoapi_request.headers.get('content-type')
             if content_type is not None:
                 if content_type == 'application/geo+json':
-                    return get_response(
-                        api_.manage_collection_item(request, 'create',
-                                                    collection_id))
+                    pygeoapi_response = api_.manage_collection_item(
+                        pygeoapi_request, 'create', collection_id)
                 else:
-                    return get_response(
-                        api_.post_collection_items(request, collection_id))
-        elif request.method == 'OPTIONS':
-            return get_response(
-                api_.manage_collection_item(request, 'options', collection_id))
+                    pygeoapi_response = api_.post_collection_items(
+                        pygeoapi_request, collection_id)
+        elif pygeoapi_request.method == 'OPTIONS':
+            pygeoapi_response = api_.manage_collection_item(
+                pygeoapi_request, 'options', collection_id)
 
-    elif request.method == 'DELETE':
-        return get_response(
-            api_.manage_collection_item(request, 'delete',
-                                        collection_id, item_id))
-    elif request.method == 'PUT':
-        return get_response(
-            api_.manage_collection_item(request, 'update',
-                                        collection_id, item_id))
-    elif request.method == 'OPTIONS':
-        return get_response(
-            api_.manage_collection_item(request, 'options',
-                                        collection_id, item_id))
+    elif pygeoapi_request.method == 'DELETE':
+        pygeoapi_response = api_.manage_collection_item(
+            pygeoapi_request, 'delete', collection_id, item_id)
+    elif pygeoapi_request.method == 'PUT':
+        pygeoapi_response = api_.manage_collection_item(
+            pygeoapi_request, 'update', collection_id, item_id)
+    elif pygeoapi_request.method == 'OPTIONS':
+        pygeoapi_response = api_.manage_collection_item(
+            pygeoapi_request, 'options', collection_id, item_id)
     else:
-        return get_response(api_.get_collection_item(
-            request, collection_id, item_id))
+        pygeoapi_response = api_.get_collection_item(
+            pygeoapi_request, collection_id, item_id)
+    return pygeoapi_response
 
 
-async def collection_coverage(request: Request, collection_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collection_coverage(
+        pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API - Coverages coverage endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: Starlette HTTP Response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-
-    return get_response(api_.get_collection_coverage(request, collection_id))
+    return api_.get_collection_coverage(pygeoapi_request, collection_id)
 
 
-async def collection_coverage_domainset(request: Request, collection_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collection_coverage_domainset(
+        pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API - Coverages coverage domainset endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: Starlette HTTP Response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-
-    return get_response(api_.get_collection_coverage_domainset(
-        request, collection_id))
+    return api_.get_collection_coverage_domainset(
+        pygeoapi_request, collection_id)
 
 
-async def collection_coverage_rangetype(request: Request, collection_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collection_coverage_rangetype(
+        pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API - Coverages coverage rangetype endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: Starlette HTTP Response
     """
 
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-
-    return get_response(api_.get_collection_coverage_rangetype(
-        request, collection_id))
+    return api_.get_collection_coverage_rangetype(
+        pygeoapi_request, collection_id)
 
 
-async def collection_map(request: Request, collection_id, style_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collection_map(
+        pygeoapi_request: APIRequest, collection_id, style_id=None):
     """
     OGC API - Maps map render endpoint
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param style_id: style identifier
 
     :returns: HTTP response
     """
 
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    if 'style_id' in request.path_params:
-        style_id = request.path_params['style_id']
-
-    return get_response(api_.get_collection_map(
-        request, collection_id, style_id))
+    return api_.get_collection_map(pygeoapi_request, collection_id, style_id)
 
 
-async def get_processes(request: Request, process_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_processes(pygeoapi_request: APIRequest, process_id=None):
     """
     OGC API - Processes description endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param process_id: identifier of process to describe
 
     :returns: Starlette HTTP Response
     """
-    if 'process_id' in request.path_params:
-        process_id = request.path_params['process_id']
-
-    return get_response(api_.describe_processes(request, process_id))
+    return api_.describe_processes(pygeoapi_request, process_id)
 
 
-async def get_jobs(request: Request, job_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_jobs(pygeoapi_request: APIRequest, job_id=None):
     """
     OGC API - Processes jobs endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param job_id: job identifier
 
     :returns: Starlette HTTP Response
     """
 
-    if 'job_id' in request.path_params:
-        job_id = request.path_params['job_id']
-
     if job_id is None:  # list of submit job
-        return get_response(api_.get_jobs(request))
+        pygeoapi_response = api_.get_jobs(pygeoapi_request)
     else:  # get or delete job
-        if request.method == 'DELETE':
-            return get_response(api_.delete_job(job_id))
+        if pygeoapi_request.method == 'DELETE':
+            pygeoapi_response = api_.delete_job(pygeoapi_request, job_id)
         else:  # Return status of a specific job
-            return get_response(api_.get_jobs(request, job_id))
+            pygeoapi_response = api_.get_jobs(pygeoapi_request, job_id)
+    return pygeoapi_response
 
 
-async def execute_process_jobs(request: Request, process_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def execute_process_jobs(pygeoapi_request: APIRequest, process_id=None):
     """
     OGC API - Processes jobs endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param process_id: process identifier
 
     :returns: Starlette HTTP Response
     """
 
-    if 'process_id' in request.path_params:
-        process_id = request.path_params['process_id']
-
-    return get_response(api_.execute_process(request, process_id))
+    return api_.execute_process(pygeoapi_request, process_id)
 
 
-async def get_job_result(request: Request, job_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_job_result(pygeoapi_request: APIRequest, job_id=None):
     """
     OGC API - Processes job result endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param job_id: job identifier
 
     :returns: HTTP response
     """
 
-    if 'job_id' in request.path_params:
-        job_id = request.path_params['job_id']
-
-    return get_response(api_.get_job_result(request, job_id))
+    return api_.get_job_result(pygeoapi_request, job_id)
 
 
-async def get_job_result_resource(request: Request,
-                                  job_id=None, resource=None):
+@adapt_starlette_request_to_pygeoapi
+async def get_job_result_resource(
+        pygeoapi_request: APIRequest, job_id=None, resource=None):
     """
     OGC API - Processes job result resource endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param job_id: job identifier
     :param resource: job resource
 
     :returns: HTTP response
     """
 
-    if 'job_id' in request.path_params:
-        job_id = request.path_params['job_id']
-    if 'resource' in request.path_params:
-        resource = request.path_params['resource']
-
-    return get_response(api_.get_job_result_resource(
-        request, job_id, resource))
+    return api_.get_job_result_resource(pygeoapi_request, job_id, resource)
 
 
-async def get_collection_edr_query(request: Request, collection_id=None, instance_id=None):  # noqa
+@adapt_starlette_request_to_pygeoapi
+async def get_collection_edr_query(
+        pygeoapi_request: APIRequest, collection_id=None, instance_id=None):  # noqa
     """
     OGC EDR API endpoints
 
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
     :param instance_id: instance identifier
 
     :returns: HTTP response
     """
 
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-
-    if 'instance_id' in request.path_params:
-        instance_id = request.path_params['instance_id']
-
-    query_type = request["path"].split('/')[-1]  # noqa
-    return get_response(api_.get_collection_edr_query(request, collection_id,
-                                                      instance_id, query_type))
+    query_type = pygeoapi_request.path_info.split('/')[-1]  # noqa
+    return api_.get_collection_edr_query(
+        pygeoapi_request, collection_id, instance_id, query_type)
 
 
-async def collections(request: Request, collection_id=None):
+@adapt_starlette_request_to_pygeoapi
+async def collections(pygeoapi_request: APIRequest, collection_id=None):
     """
     OGC API collections endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
     :param collection_id: collection identifier
 
     :returns: Starlette HTTP Response
     """
-    if 'collection_id' in request.path_params:
-        collection_id = request.path_params['collection_id']
-    return get_response(api_.describe_collections(request, collection_id))
+    return api_.describe_collections(pygeoapi_request, collection_id)
 
 
-async def stac_catalog_root(request: Request):
+@adapt_starlette_request_to_pygeoapi
+async def stac_catalog_root(pygeoapi_request: APIRequest):
     """
     STAC root endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
 
     :returns: Starlette HTTP response
     """
-    return get_response(api_.get_stac_root(request))
+    return api_.get_stac_root(pygeoapi_request)
 
 
-async def stac_catalog_path(request: Request):
+@adapt_starlette_request_to_pygeoapi
+async def stac_catalog_path(pygeoapi_request: APIRequest, path):
     """
     STAC endpoint
 
-    :param request: Starlette Request instance
+    :param pygeoapi_request: pygeoapi's APIRequest instance
+    :param path: catalog path
 
     :returns: Starlette HTTP response
     """
-    path = request.path_params["path"]
-    return get_response(api_.get_stac_path(request, path))
+    return api_.get_stac_path(pygeoapi_request, path)
 
 
 class ApiRulesMiddleware:

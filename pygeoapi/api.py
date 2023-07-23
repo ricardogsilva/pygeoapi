@@ -80,7 +80,7 @@ from pygeoapi.provider.tile import (ProviderTileNotFoundError,
                                     ProviderTileQueryError,
                                     ProviderTilesetIdNotFoundError)
 from pygeoapi.models.cql import CQLModel
-from pygeoapi.request import APIRequest, pre_process
+from pygeoapi.request import APIRequest
 from pygeoapi.util import (dategetter, RequestedProcessExecutionMode,
                            DATETIME_FORMAT, UrlPrefetcher,
                            filter_dict_by_key_value, get_provider_by_type,
