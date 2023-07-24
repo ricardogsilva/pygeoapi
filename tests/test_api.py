@@ -425,35 +425,34 @@ def test_api_exception(config, api_):
 
 
 def test_gzip(config, api_):
-    locales = getattr(api_, 'locales', set())
     # Requests for each response type and gzip encoding
     req_gzip_json = APIRequest(
         mock_request(
             HTTP_ACCEPT=FORMAT_TYPES[F_JSON],
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
-        locales
+        api_.locales
     )
     req_gzip_jsonld = APIRequest(
         mock_request(
             HTTP_ACCEPT=FORMAT_TYPES[F_JSONLD],
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
-        locales
+        api_.locales
     )
     req_gzip_html = APIRequest(
         mock_request(
             HTTP_ACCEPT=FORMAT_TYPES[F_HTML],
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
-        locales
+        api_.locales
     )
     req_gzip_gzip = APIRequest(
         mock_request(
             HTTP_ACCEPT='application/gzip',
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
-        locales
+        api_.locales
     )
 
     # Responses from server config without gzip compression
@@ -476,7 +475,15 @@ def test_gzip(config, api_):
     rsp_json_headers, _, rsp_gzip_json = api_.landing_page(req_gzip_json)
     rsp_jsonld_headers, _, rsp_gzip_jsonld = api_.landing_page(req_gzip_jsonld)
     rsp_html_headers, _, rsp_gzip_html = api_.landing_page(req_gzip_html)
-    rsp_gzip_headers, _, rsp_gzip_gzip = api_.landing_page(req_gzip_gzip)
+    rsp_gzip_headers, _, rsp_gzip_gzip = api_.landing_page(
+        APIRequest(
+            mock_request(
+                HTTP_ACCEPT='application/gzip',
+                HTTP_ACCEPT_ENCODING=F_GZIP
+            ),
+            api_.locales
+        )
+    )
 
     # Validate compressed json response
     assert rsp_json_headers['Content-Type'] == \
@@ -541,12 +548,13 @@ def test_gzip(config, api_):
 
 
 def test_gzip_csv(config, api_):
-    req_csv = mock_request({'f': 'csv'})
+    req_csv = APIRequest(mock_request({'f': 'csv'}), api_.locales)
     rsp_csv_headers, _, rsp_csv = api_.get_collection_items(req_csv, 'obs')
     assert rsp_csv_headers['Content-Type'] == 'text/csv; charset=utf-8'
     rsp_csv = rsp_csv.decode('utf-8')
 
-    req_csv = mock_request({'f': 'csv'}, HTTP_ACCEPT_ENCODING=F_GZIP)
+    req_csv = APIRequest(
+        mock_request({'f': 'csv'}, HTTP_ACCEPT_ENCODING=F_GZIP), api_.locales)
     rsp_csv_headers, _, rsp_csv_gzip = api_.get_collection_items(req_csv, 'obs') # noqa
     assert rsp_csv_headers['Content-Type'] == 'text/csv; charset=utf-8'
     rsp_csv_ = gzip.decompress(rsp_csv_gzip).decode('utf-8')
@@ -556,7 +564,8 @@ def test_gzip_csv(config, api_):
     config['server']['encoding'] = 'utf-16'
     api_ = API(config)
 
-    req_csv = mock_request({'f': 'csv'}, HTTP_ACCEPT_ENCODING=F_GZIP)
+    req_csv = APIRequest(
+        mock_request({'f': 'csv'}, HTTP_ACCEPT_ENCODING=F_GZIP), api_.locales)
     rsp_csv_headers, _, rsp_csv_gzip = api_.get_collection_items(req_csv, 'obs') # noqa
     assert rsp_csv_headers['Content-Type'] == 'text/csv; charset=utf-8'
     rsp_csv_ = gzip.decompress(rsp_csv_gzip).decode('utf-8')
@@ -1766,7 +1775,7 @@ def test_execute_process(config, api_):
     cleanup_jobs = set()
 
     # Test posting empty payload to existing process
-    req = APIRequest(mock_request(data=''), api_.locales)
+    req = APIRequest.with_data(mock_request(data=''), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'hello-world')
     assert rsp_headers['Content-Language'] == 'en-US'
 
@@ -1775,7 +1784,7 @@ def test_execute_process(config, api_):
     assert 'Location' not in rsp_headers
     assert data['code'] == 'MissingParameterValue'
 
-    req = APIRequest(mock_request(data=req_body_0), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_0), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'foo')
 
     data = json.loads(response)
@@ -1796,7 +1805,7 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(mock_request(data=req_body_1), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_1), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'hello-world')
 
     data = json.loads(response)
@@ -1810,7 +1819,7 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(mock_request(data=req_body_2), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_2), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'hello-world')
 
     data = json.loads(response)
@@ -1821,7 +1830,7 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(mock_request(data=req_body_3), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_3), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'hello-world')
 
     data = json.loads(response)
@@ -1832,7 +1841,7 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(mock_request(data=req_body_4), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_4), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'hello-world')
 
     data = json.loads(response)
@@ -1842,20 +1851,8 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(mock_request(data=req_body_5), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_5), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'hello-world')
-    data = json.loads(response)
-    assert code == HTTPStatus.OK
-    assert 'Location' in rsp_headers
-    assert data['code'] == 'InvalidParameterValue'
-    assert data['description'] == 'Error updating job'
-
-    cleanup_jobs.add(tuple(['hello-world',
-                            rsp_headers['Location'].split('/')[-1]]))
-
-    req = APIRequest(mock_request(data=req_body_6), api_.locales)
-    rsp_headers, code, response = api_.execute_process(req, 'hello-world')
-
     data = json.loads(response)
     assert code == HTTPStatus.OK
     assert 'Location' in rsp_headers
@@ -1865,7 +1862,19 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(mock_request(data=req_body_0), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_6), api_.locales)
+    rsp_headers, code, response = api_.execute_process(req, 'hello-world')
+
+    data = json.loads(response)
+    assert code == HTTPStatus.OK
+    assert 'Location' in rsp_headers
+    assert data['code'] == 'InvalidParameterValue'
+    assert data['description'] == 'Error updating job'
+
+    cleanup_jobs.add(tuple(['hello-world',
+                            rsp_headers['Location'].split('/')[-1]]))
+
+    req = APIRequest.with_data(mock_request(data=req_body_0), api_.locales)
     rsp_headers, code, response = api_.execute_process(req, 'goodbye-world')
 
     response = json.loads(response)
@@ -1881,7 +1890,7 @@ def test_execute_process(config, api_):
     cleanup_jobs.add(tuple(['hello-world',
                             rsp_headers['Location'].split('/')[-1]]))
 
-    req = APIRequest(
+    req = APIRequest.with_data(
         mock_request(
             data=req_body_1,
             HTTP_Prefer='respond-async'
@@ -1901,13 +1910,16 @@ def test_execute_process(config, api_):
     # Cleanup
     time.sleep(2)  # Allow time for any outstanding async jobs
     for _, job_id in cleanup_jobs:
-        rsp_headers, code, response = api_.delete_job(mock_request(), job_id)
+        rsp_headers, code, response = api_.delete_job(
+            APIRequest(mock_request(), api_.locales), job_id)
         assert code == HTTPStatus.OK
 
 
 def test_delete_job(api_):
     rsp_headers, code, response = api_.delete_job(
-        mock_request(), 'does-not-exist')
+        APIRequest(mock_request(), api_.locales),
+        'does-not-exist'
+    )
 
     assert code == HTTPStatus.NOT_FOUND
 
@@ -1923,7 +1935,7 @@ def test_delete_job(api_):
         }
     }
 
-    req = APIRequest(mock_request(data=req_body_sync), api_.locales)
+    req = APIRequest.with_data(mock_request(data=req_body_sync), api_.locales)
     rsp_headers, code, response = api_.execute_process(
         req, 'hello-world')
 
@@ -1933,14 +1945,20 @@ def test_delete_job(api_):
     assert data['value'] == 'Hello Sync Test Deletion!'
 
     job_id = rsp_headers['Location'].split('/')[-1]
-    rsp_headers, code, response = api_.delete_job(mock_request(), job_id)
+    rsp_headers, code, response = api_.delete_job(
+        APIRequest(mock_request(), api_.locales),
+        job_id
+    )
 
     assert code == HTTPStatus.OK
 
-    rsp_headers, code, response = api_.delete_job(mock_request(), job_id)
+    rsp_headers, code, response = api_.delete_job(
+        APIRequest(mock_request(), api_.locales),
+        job_id
+    )
     assert code == HTTPStatus.NOT_FOUND
 
-    req = APIRequest(
+    req = APIRequest.with_data(
         mock_request(
             data=req_body_async,
             HTTP_Prefer='respond-async'
@@ -1955,10 +1973,16 @@ def test_delete_job(api_):
 
     time.sleep(2)  # Allow time for async execution to complete
     job_id = rsp_headers['Location'].split('/')[-1]
-    rsp_headers, code, response = api_.delete_job(mock_request(), job_id)
+    rsp_headers, code, response = api_.delete_job(
+        APIRequest(mock_request(), api_.locales),
+        job_id
+    )
     assert code == HTTPStatus.OK
 
-    rsp_headers, code, response = api_.delete_job(mock_request(), job_id)
+    rsp_headers, code, response = api_.delete_job(
+        APIRequest(mock_request(), api_.locales),
+        job_id
+    )
     assert code == HTTPStatus.NOT_FOUND
 
 
