@@ -1,18 +1,14 @@
 """Proof-of-concept (POC) for RFC2.
 
-This POC defines:
+TODO in order to be able to demo this POC:
 
-- an internal model for a pygeoapi process
-- the PyGeoApiSchema abstract class
+- Implement pygeoapi as a flask extension
 
-
-usage:
-
->>> from pygeoapi.core import Api
->>> # before instantiating the api we would load some configuration
->>> api = Api()
->>> list_processes_response = api.list_processes()
->>> api.validate(list_processes_response)
+- pygeoapi must drop support for Python v3.7, as the `referencing`
+  third-party package being used here only supports Python 3.8+
+- pygeoapi must drop the `datamodel-code-generator` dependency, as it prevents
+  installation of a more recent version of `jsonschema` which is required in
+  order to work with schema registries
 """
 import abc
 import dataclasses
@@ -28,9 +24,6 @@ from referencing import (
 )
 from pathlib import Path
 from typing import Dict, List, Optional
-
-import jsonschema
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -80,6 +73,11 @@ def _replace_refs_in_schema(
 ):
     """Traverse the input schema dict and replace `$ref` entries.
 
+    This function exists in order to overcome a percieved difficulty in
+    wokring with the official OGC API schemas - these use relative filesystem
+    paths in their `$ref` properties, whereby the paths are relative to their
+    own directory, and not relative to some common base path.
+
     `$ref` entries will be replaced by a relative path
     """
     for key, value in the_dict.items():
@@ -118,17 +116,11 @@ class PyGeoApiSchema(abc.ABC):
     @property
     @abc.abstractmethod
     def schema_uri(self) -> Optional[str]:
-        ...
+        """Implement this as a class variable or as a method in child classes."""
 
     @abc.abstractmethod
     def as_dict(self) -> Dict:
-        ...
-
-    # def validate(self, schema_registry: Registry):
-    #     """Validate this instance against its own schema."""
-    #     schema = schema_registry[self.schema_uri].contents
-    #     validator = Draft202012Validator(schema, registry=schema_registry)
-    #     return validator.validate(self.as_dict())
+        """Implement this method in child classes."""
 
 
 @dataclasses.dataclass
@@ -176,8 +168,11 @@ class ProcessManager:
         # a crude implementation for brevity reasons only, as process
         # internals are not relevant to the RFC scope
         return [
-            PygeoApiProcess(id="hello-world", some_detail="irrelevant")
-        ]
+            PygeoApiProcess(id="hello-world1", some_detail="irrelevant"),
+            PygeoApiProcess(id="hello-world2", some_detail="irrelevant"),
+            PygeoApiProcess(id="hello-world3", some_detail="irrelevant"),
+            PygeoApiProcess(id="hello-world4", some_detail="irrelevant"),
+        ][:limit]
 
 
 class Api:
@@ -210,17 +205,26 @@ pygeoapi_blueprint = flask.Blueprint("pygeoapi", __name__)
 
 @pygeoapi_blueprint.route("/processes")
 def list_processes():
-    limit = flask.request.args.get("limit")
+    limit = int(
+        flask.request.args.get(
+            "limit", flask.current_app.config["PYGEOAPI_LIMIT"]
+        )
+    )
     api = flask.current_app.extensions["pygeoapi"]["api"]
     response = api.list_processes(limit)
+    if flask.current_app.config["PYGEOAPI_VALIDATE_RESPONSES"]:
+        api.validate(response)
     return response.as_dict()
 
 
 def create_app(blueprints):
-    schemas_base_dir = Path(
-        os.getenv("PYGEOAPI__OGC_API_PROCESSES_SCHEMAS_BASE_DIR"))
+    # for brevity, a very simple way to pass configuration to the flask application
     app = flask.Flask(__name__)
-    app.extensions["pygeoapi"] = {"api": Api(schemas_base_dir)}
+    app.config["PYGEOAPI_SCHEMAS_BASE_DIR"] = Path(
+        os.getenv("PYGEOAPI__OGC_API_PROCESSES_SCHEMAS_BASE_DIR"))
+    app.config["PYGEOAPI_LIMIT"] = 100
+    app.config["PYGEOAPI_VALIDATE_RESPONSES"] = True
+    app.extensions["pygeoapi"] = {"api": Api(app.config["PYGEOAPI_SCHEMAS_BASE_DIR"])}
     for blueprint in blueprints:
         app.register_blueprint(blueprint)
     return app
