@@ -41,14 +41,13 @@ from pyld import jsonld
 import pytest
 import pyproj
 from shapely.geometry import Point
+from werkzeug.test import create_environ
+from werkzeug.wrappers import Request
 
-from pygeoapi import __version__
 from pygeoapi.api import (
-    API, validate_bbox, validate_datetime,
-    validate_subset
+    API, APIRequest, FORMAT_TYPES, validate_bbox, validate_datetime,
+    validate_subset, F_HTML, F_JSON, F_JSONLD, F_GZIP, __version__
 )
-from pygeoapi.constants import FORMAT_TYPES, F_JSON, F_HTML, F_JSONLD, F_GZIP
-from pygeoapi.request import APIRequest
 from pygeoapi.util import (yaml_load, get_crs_from_uri,
                            get_api_rules, get_base_url)
 
@@ -118,10 +117,13 @@ def api_hidden_resources(config_hidden_resources):
 def test_apirequest(api_):
     # Test without (valid) locales
     with pytest.raises(ValueError):
-        req = mock_request()
-        APIRequest(req, [])
-        APIRequest(req, None)
-        APIRequest(req, ['zz'])
+        environ = create_environ(base_url='http://localhost:5000/', data=data)
+        environ.update(headers)
+        request = Request(environ)
+
+        APIRequest(request, [])
+        APIRequest(request, None)
+        APIRequest(request, ['zz'])
 
     # Test all supported formats from query args
     for f, mt in FORMAT_TYPES.items():
@@ -426,28 +428,28 @@ def test_api_exception(config, api_):
 
 def test_gzip(config, api_):
     # Requests for each response type and gzip encoding
-    req_gzip_json = APIRequest(
+    req_gzip_json = APIRequest.with_data(
         mock_request(
             HTTP_ACCEPT=FORMAT_TYPES[F_JSON],
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
         api_.locales
     )
-    req_gzip_jsonld = APIRequest(
+    req_gzip_jsonld = APIRequest.with_data(
         mock_request(
             HTTP_ACCEPT=FORMAT_TYPES[F_JSONLD],
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
         api_.locales
     )
-    req_gzip_html = APIRequest(
+    req_gzip_html = APIRequest.with_data(
         mock_request(
             HTTP_ACCEPT=FORMAT_TYPES[F_HTML],
             HTTP_ACCEPT_ENCODING=F_GZIP
         ),
         api_.locales
     )
-    req_gzip_gzip = APIRequest(
+    req_gzip_gzip = APIRequest.with_data(
         mock_request(
             HTTP_ACCEPT='application/gzip',
             HTTP_ACCEPT_ENCODING=F_GZIP
@@ -458,10 +460,13 @@ def test_gzip(config, api_):
     # Responses from server config without gzip compression
     rsp_headers, _, rsp_json = api_.landing_page(req_gzip_json)
     assert rsp_headers['Content-Type'] == FORMAT_TYPES[F_JSON]
+
     rsp_headers, _, rsp_jsonld = api_.landing_page(req_gzip_jsonld)
     assert rsp_headers['Content-Type'] == FORMAT_TYPES[F_JSONLD]
+
     rsp_headers, _, rsp_html = api_.landing_page(req_gzip_html)
     assert rsp_headers['Content-Type'] == FORMAT_TYPES[F_HTML]
+
     rsp_headers, _, _ = api_.landing_page(req_gzip_gzip)
     assert rsp_headers['Content-Type'] == FORMAT_TYPES[F_JSON]
 
@@ -473,78 +478,72 @@ def test_gzip(config, api_):
 
     # Responses from server with gzip compression
     rsp_json_headers, _, rsp_gzip_json = api_.landing_page(req_gzip_json)
-    rsp_jsonld_headers, _, rsp_gzip_jsonld = api_.landing_page(req_gzip_jsonld)
-    rsp_html_headers, _, rsp_gzip_html = api_.landing_page(req_gzip_html)
-    rsp_gzip_headers, _, rsp_gzip_gzip = api_.landing_page(
-        APIRequest(
-            mock_request(
-                HTTP_ACCEPT='application/gzip',
-                HTTP_ACCEPT_ENCODING=F_GZIP
-            ),
-            api_.locales
-        )
-    )
-
-    # Validate compressed json response
     assert rsp_json_headers['Content-Type'] == \
-        f'{FORMAT_TYPES[F_JSON]}; charset={enc_16}'
+           f'{FORMAT_TYPES[F_JSON]}; charset={enc_16}'
     assert rsp_json_headers['Content-Encoding'] == F_GZIP
-
     parsed_gzip_json = gzip.decompress(rsp_gzip_json).decode(enc_16)
     assert isinstance(parsed_gzip_json, str)
     parsed_gzip_json = json.loads(parsed_gzip_json)
     assert isinstance(parsed_gzip_json, dict)
     assert parsed_gzip_json == json.loads(rsp_json)
 
-    # Validate compressed jsonld response
+    rsp_jsonld_headers, _, rsp_gzip_jsonld = api_.landing_page(req_gzip_jsonld)
     assert rsp_jsonld_headers['Content-Type'] == \
-        f'{FORMAT_TYPES[F_JSONLD]}; charset={enc_16}'
+           f'{FORMAT_TYPES[F_JSONLD]}; charset={enc_16}'
     assert rsp_jsonld_headers['Content-Encoding'] == F_GZIP
-
     parsed_gzip_jsonld = gzip.decompress(rsp_gzip_jsonld).decode(enc_16)
     assert isinstance(parsed_gzip_jsonld, str)
     parsed_gzip_jsonld = json.loads(parsed_gzip_jsonld)
     assert isinstance(parsed_gzip_jsonld, dict)
     assert parsed_gzip_jsonld == json.loads(rsp_jsonld)
 
-    # Validate compressed html response
+    rsp_html_headers, _, rsp_gzip_html = api_.landing_page(req_gzip_html)
     assert rsp_html_headers['Content-Type'] == \
-        f'{FORMAT_TYPES[F_HTML]}; charset={enc_16}'
+           f'{FORMAT_TYPES[F_HTML]}; charset={enc_16}'
     assert rsp_html_headers['Content-Encoding'] == F_GZIP
-
     parsed_gzip_html = gzip.decompress(rsp_gzip_html).decode(enc_16)
     assert isinstance(parsed_gzip_html, str)
     assert parsed_gzip_html == rsp_html
 
-    # Validate compressed gzip response
+    new_req_gzip_gzip = APIRequest.with_data(
+        mock_request(
+            HTTP_ACCEPT='application/gzip',
+            HTTP_ACCEPT_ENCODING=F_GZIP
+        ),
+        api_.locales
+    )
+    rsp_gzip_headers, _, rsp_gzip_gzip = api_.landing_page(new_req_gzip_gzip)
+    print(f"req_gzip_gzip format as understood by pygeoapi's request class: {new_req_gzip_gzip.format}")
+    print(f"rsp_gzip_headers: {rsp_gzip_headers}")
+    print(f"FORMAT_TYPES[F_GZIP]: {FORMAT_TYPES[F_GZIP]}")
     assert rsp_gzip_headers['Content-Type'] == \
-        f'{FORMAT_TYPES[F_GZIP]}; charset={enc_16}'
+           f'{FORMAT_TYPES[F_GZIP]}; charset={enc_16}'
     assert rsp_gzip_headers['Content-Encoding'] == F_GZIP
-
     parsed_gzip_gzip = gzip.decompress(rsp_gzip_gzip).decode(enc_16)
     assert isinstance(parsed_gzip_gzip, str)
     parsed_gzip_gzip = json.loads(parsed_gzip_gzip)
     assert isinstance(parsed_gzip_gzip, dict)
 
     # Requests without content encoding header
-    req_json = mock_request(HTTP_ACCEPT=FORMAT_TYPES[F_JSON])
-    req_jsonld = mock_request(HTTP_ACCEPT=FORMAT_TYPES[F_JSONLD])
-    req_html = mock_request(HTTP_ACCEPT=FORMAT_TYPES[F_HTML])
-
-    # Responses without content encoding
+    req_json = APIRequest(
+        mock_request(HTTP_ACCEPT=FORMAT_TYPES[F_JSON]), api_.locales)
     _, _, rsp_json_ = api_.landing_page(req_json)
-    _, _, rsp_jsonld_ = api_.landing_page(req_jsonld)
-    _, _, rsp_html_ = api_.landing_page(req_html)
-
-    # Confirm each request is the same when decompressed
     assert rsp_json_ == rsp_json == \
-        gzip.decompress(rsp_gzip_json).decode(enc_16)
+           gzip.decompress(rsp_gzip_json).decode(enc_16)
 
+
+    req_jsonld = APIRequest(
+        mock_request(HTTP_ACCEPT=FORMAT_TYPES[F_JSONLD]), api_.locales)
+    _, _, rsp_jsonld_ = api_.landing_page(req_jsonld)
     assert rsp_jsonld_ == rsp_jsonld == \
-        gzip.decompress(rsp_gzip_jsonld).decode(enc_16)
+           gzip.decompress(rsp_gzip_jsonld).decode(enc_16)
 
+
+    req_html = APIRequest(mock_request(
+        HTTP_ACCEPT=FORMAT_TYPES[F_HTML]), api_.locales)
+    _, _, rsp_html_ = api_.landing_page(req_html)
     assert rsp_html_ == rsp_html == \
-        gzip.decompress(rsp_gzip_html).decode(enc_16)
+           gzip.decompress(rsp_gzip_html).decode(enc_16)
 
 
 def test_gzip_csv(config, api_):

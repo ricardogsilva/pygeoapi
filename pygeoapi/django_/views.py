@@ -41,9 +41,8 @@ from typing import Tuple, Dict, Optional
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
-from pygeoapi.api import API
+from pygeoapi.api import API, APIRequest
 from pygeoapi.openapi import get_oas
-from pygeoapi.request import APIRequest
 
 
 def adapt_django_request_to_pygeoapi(func):

@@ -35,7 +35,6 @@ import json
 import logging
 from typing import Callable
 
-from pygeoapi.request import APIRequest
 from pygeoapi.util import is_url, render_j2_template
 from pygeoapi import l10n
 from shapely.geometry import shape
@@ -54,15 +53,16 @@ def jsonldify(func: Callable) -> Callable:
     :returns: `func`
     """
 
-    def inner(api_, request: APIRequest, *args, **kwargs):
-        print(f"inside jsonldify - locals: {locals()}")
-        format_ = getattr(request, 'format')
+    def inner(*args, **kwargs):
+        apireq = args[1]
+        format_ = getattr(apireq, 'format')
         if not format_ == 'jsonld':
-            return func(api_, request, *args, **kwargs)
+            return func(*args, **kwargs)
         # Function args have been pre-processed, so get locale from APIRequest
-        locale_ = getattr(request, 'locale')
+        locale_ = getattr(apireq, 'locale')
         LOGGER.debug('Creating JSON-LD representation')
-        cfg = api_.config
+        cls = args[0]
+        cfg = cls.config
         meta = cfg.get('metadata', {})
         contact = meta.get('contact', {})
         provider = meta.get('provider', {})
@@ -110,8 +110,8 @@ def jsonldify(func: Callable) -> Callable:
             }
           }
         }
-        api_.fcmld = fcmld
-        return func(api_, request, *args, **kwargs)
+        cls.fcmld = fcmld
+        return func(cls, *args[1:], **kwargs)
     return inner
 
 

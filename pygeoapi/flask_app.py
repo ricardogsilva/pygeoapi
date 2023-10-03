@@ -39,8 +39,7 @@ import click
 
 from flask import Flask, Blueprint, make_response, request, send_from_directory
 
-from pygeoapi.api import API
-from pygeoapi.request import APIRequest
+from pygeoapi.api import API, APIRequest
 from pygeoapi.util import get_mimetype, yaml_load, get_api_rules
 
 

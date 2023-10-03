@@ -52,8 +52,7 @@ from starlette.responses import (
 )
 import uvicorn
 
-from pygeoapi.api import API
-from pygeoapi.request import APIRequest
+from pygeoapi.api import API, APIRequest
 from pygeoapi.util import yaml_load, get_api_rules
 
 LOGGER = logging.getLogger(__name__)

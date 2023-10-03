@@ -34,28 +34,5 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # =================================================================
-from collections import OrderedDict
 
-from pygeoapi import __version__
 
-F_GZIP = 'gzip'
-F_HTML = 'html'
-F_JSON = 'json'
-F_JSONLD = 'jsonld'
-F_MVT = 'mvt'
-F_PNG = 'png'
-
-#: Formats allowed for ?f= requests (order matters for complex MIME types)
-FORMAT_TYPES = OrderedDict((
-    (F_HTML, 'text/html'),
-    (F_JSONLD, 'application/ld+json'),
-    (F_JSON, 'application/json'),
-    (F_PNG, 'image/png'),
-    (F_MVT, 'application/vnd.mapbox-vector-tile')
-))
-
-#: Return headers for requests (e.g:X-Powered-By)
-HEADERS = {
-    'Content-Type': 'application/json',
-    'X-Powered-By': f'pygeoapi {__version__}'
-}
