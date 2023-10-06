@@ -1,0 +1,147 @@
+{% extends "pygeoapi/_base.html" %}
+{% block title %}{{ super() }} {% trans %}Home{% endtrans %} {% endblock %}
+{% block body %}
+
+    <br/>
+    <section id="collections">
+        <div class="row">
+            <div class="col-md-8 col-sm-12">
+
+                <section id="identification">
+                    <h1>{{ data.title }}</h1>
+                    <p>{{ data.description }}</p>
+
+                    <p>
+                        {% for kw in pygeoapi_identification.keywords %}
+                            <span class="badge bg-primary text-bg-primary">{{ kw }}</span>
+                        {% endfor %}
+                    </p>
+
+                    <div class="card bg-light mb-3">
+                        <div class="card-body">
+                            {% if pygeoapi_identification.terms_of_service %}
+                                <div class="row">
+                                    <div class="col-sm-4">
+                                        {% trans %}Terms of service{% endtrans %}
+                                    </div>
+                                    <div class="col-sm-8">
+                                        {{ pygeoapi_identification.terms_of_service | urlize() }}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            {% if pygeoapi_license.url %}
+                                <div class="row">
+                                    <div class="col-sm-4">
+                                        {% trans %}License{% endtrans %}
+                                    </div>
+                                    <div class="col-sm-8">
+                                        <a href="{{ pygeoapi_license.url }}">
+                                            {{ pygeoapi_license.name or pygeoapi_license.url }}</a>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </section>
+{#                {% if data['collection'] %}#}
+{#                    <section id="collections">#}
+{#                        <h2>{% trans %}Collections{% endtrans %}</h2>#}
+{#                        <p>#}
+{#                            <a href="{{ config['server']['url'] }}/collections?f=html">{% trans %}View the collections in this service{% endtrans %}</a>#}
+{#                        </p>#}
+{#                    </section>#}
+{#                {% endif %}#}
+{#                {% if data['stac'] %}#}
+{#                    <section id="collections">#}
+{#                        <h2>{% trans %}SpatioTemporal Assets{% endtrans %}</h2>#}
+{#                        <p>#}
+{#                            <a href="{{ config['server']['url'] }}/stac?f=html">{% trans %}View the SpatioTemporal Assets in this service{% endtrans %}</a>#}
+{#                        </p>#}
+{#                    </section>#}
+{#                {% endif %}#}
+                {% if data['processes'] %}
+                    <section id="processes">
+                        <h2>{% trans %}Processes{% endtrans %}</h2>
+                        <p>
+                            <a href="{{ config['server']['url'] }}/processes?f=html">{% trans %}View the processes in this service{% endtrans %}</a>
+                        </p>
+                    </section>
+                    <section id="jobs">
+                        <h2>{% trans %}Jobs{% endtrans %}</h2>
+                        <p>
+                            <a title="Browse jobs" href="{{config.server.url}}/jobs">{% trans %}Browse jobs{% endtrans %}</a>
+                        </p>
+                    </section>
+                {% endif %}
+{#                <section id="openapi">#}
+{#                    <h2>{% trans %}API Definition{% endtrans %}</h2>#}
+{#                    <p>#}
+{#                        {% trans %}Documentation{% endtrans %}: <a href="{{ config['server']['url'] }}/openapi?f=html">{% trans %}Swagger UI{% endtrans %}</a> <a href="{{ config['server']['url'] }}/openapi?f=html&ui=redoc">{% trans %}ReDoc{% endtrans %}</a>#}
+{#                    </p>#}
+{#                    <p>#}
+{#                        <a href="{{ config['server']['url'] }}/openapi?f=json">{% trans %}OpenAPI Document{% endtrans %}</a>#}
+{#                    </p>#}
+{#                </section>#}
+                <section id="conformance">
+                    <h2>{% trans %}Conformance{% endtrans %}</h2>
+                    <p>
+                        <a href="{{ url_for('pygeoapi.get_conformance') }}">{% trans %}View the conformance classes of this service{% endtrans %}</a>
+                    </p>
+                </section>
+
+            </div>
+            <div class="col-md-4 col-sm-12">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <b>{% trans %}Provider{% endtrans %}</b>
+                    </div>
+                    <div class="card-body">
+                        <b>{{ pygeoapi_provider.name }}</b><br/>
+                        <a href="{{ pygeoapi_provider.url }}">{{ pygeoapi_provider.name or pygeoapi_provider.url }}</a><br/>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <b>{% trans %}Contact point{% endtrans %}</b>
+                    </div>
+                    <div class="card-body">
+                        <b>{% trans %}Address{% endtrans %}</b><br/>
+                        <div class="section">
+                            <span>{{ pygeoapi_point_of_contact.address }}</span><br/>
+                            <span>{{ pygeoapi_point_of_contact.city }}</span>,
+                            <span>{{ pygeoapi_point_of_contact.state_or_province }}</span><br/>
+                            <span>{{ pygeoapi_point_of_contact.postal_code }}</span><br/>
+                            <span>{{ pygeoapi_point_of_contact.country }}</span>
+                        </div>
+                        <div>
+                            <b>{% trans %}Email{% endtrans %}</b><br/>
+                            <span><a href="mailto:{{ pygeoapi_point_of_contact.email }}">{{ pygeoapi_point_of_contact.email }}</a></span><br/>
+                            {% if pygeoapi_point_of_contact.phone %}
+                                <b>{% trans %}Telephone{% endtrans %}</b><br/>
+                                <span><a href="tel:{{ pygeoapi_point_of_contact.phone }}">{{ pygeoapi_point_of_contact.phone }}</a></span><br/>
+                            {% endif %}
+                            {% if pygeoapi_point_of_contact.fax %}
+                                <b>{% trans %}Fax{% endtrans %}</b><br/>
+                                <span><a href="tel:{{ pygeoapi_point_of_contact.fax }}">{{ pygeoapi_point_of_contact.fax }}</a></span><br/>
+                            {% endif %}
+                            {% if pygeoapi_point_of_contact.url %}
+                                <b>{% trans %}Contact URL{% endtrans %}</b><br/>
+                                <span><a href="{{ pygeoapi_point_of_contact.url }}">{{ pygeoapi_point_of_contact.url }}</a></span><br/>
+                            {% endif %}
+                            {% if pygeoapi_point_of_contact.hours %}
+                                <b>{% trans %}Hours{% endtrans %}</b><br/>
+                                <span>{{ pygeoapi_point_of_contact.hours }}</span><br/>
+                            {% endif %}
+                            {% if pygeoapi_point_of_contact_instructions %}
+                                <b>{% trans %}Contact instructions{% endtrans %}</b><br/>
+                                <span>{{ pygeoapi_point_of_contact_instructions }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+{% endblock %}

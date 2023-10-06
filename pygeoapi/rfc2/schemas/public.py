@@ -81,6 +81,12 @@ class LandingPage(PyGeoApiDataClassSchema):
 
 
 @dataclasses.dataclass
+class Conformance(PyGeoApiDataClassSchema):
+    conformsTo: List[str] = dataclasses.field(default_factory=list)
+    schema_uri: str = "common/part1/1.0/openapi/schemas/confClasses.yaml"
+
+
+@dataclasses.dataclass
 class ProcessSummary(PyGeoApiDataClassSchema):
     id: str
     version: str
