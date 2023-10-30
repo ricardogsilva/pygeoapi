@@ -38,6 +38,7 @@ from flask_babel import (
     get_locale,
     Babel as FlaskBabelExtension,
 )
+from flask_openapi import OpenAPI as FlaskOpenApiExtension
 
 from .. import (
     config as pygeoapi_config,
@@ -148,6 +149,7 @@ def create_app():
     logging.basicConfig(level=logging.DEBUG if app.debug else logging.WARNING)
     FlaskBabelExtension(app=app, locale_selector=flask_babel_locale_selector)
     app.jinja_env.globals["get_locale"] = get_locale
+    FlaskOpenApiExtension(app=app)
     pygeoapi_extension = PyGeoApiFlaskExtension()
     pygeoapi_extension.init_app(app, url_resolver=flask_pygeoapi_url_resolver)
     return app

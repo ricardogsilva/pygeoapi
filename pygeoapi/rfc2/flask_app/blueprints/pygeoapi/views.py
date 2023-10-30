@@ -1,7 +1,6 @@
 import logging
 
 import flask
-import jinja2
 
 from .... import core
 from . import blueprint
@@ -14,13 +13,12 @@ def get_landing_page():
     api: core.Api = flask.current_app.extensions["pygeoapi"]["api"]
     url_resolver = flask.current_app.extensions["pygeoapi"]["url_resolver"]
     api_response = api.get_landing_page(url_resolver=url_resolver)
-    LOGGER.debug(f"{api_response=}")
     if flask.current_app.config["PYGEOAPI"]["validate_responses"]:
         api.validate(api_response)
     if "html" in flask.request.headers["accept"]:
         return flask.render_template(
             "pygeoapi/landing-page.j2.html",
-            data=api_response.as_dict()
+            data=api_response
         )
     else:
         return api_response.as_dict()
@@ -30,10 +28,13 @@ def get_landing_page():
 def get_conformance():
     api: core.Api = flask.current_app.extensions["pygeoapi"]["api"]
     api_response = api.get_conformance()
-    # since this is an HTTP application we can add the additional conformance
-    # class for OpenAPI 3.0
-    api_response.conformsTo.append(
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/req/oas30"
+    # since this is an HTTP application with support for HTML, add the
+    # additional conformance classes for HTML and OpenAPI 3.0
+    api_response.conformsTo.extend(
+        [
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/html",
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/oas30",
+        ]
     )
     if flask.current_app.config["PYGEOAPI"]["validate_responses"]:
         api.validate(api_response)
