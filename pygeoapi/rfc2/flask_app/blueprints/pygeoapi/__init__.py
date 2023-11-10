@@ -1,8 +1,9 @@
+import apiflask
 import flask
 
 from ....core import Api
 
-blueprint = flask.Blueprint(
+blueprint = apiflask.APIBlueprint(
     "pygeoapi",
     __name__,
     template_folder="templates",

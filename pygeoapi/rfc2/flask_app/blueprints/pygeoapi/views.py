@@ -1,10 +1,12 @@
 import logging
 
 import flask
-import jinja2
 
 from .... import core
-from . import blueprint
+from . import (
+    blueprint,
+    schemas,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,15 +42,18 @@ def get_conformance():
     return api_response.as_dict()
 
 
-@blueprint.route("/processes")
-def list_processes():
-    limit = int(
-        flask.request.args.get(
-            "limit", flask.current_app.config["PYGEOAPI"]["LIMIT"]
-        )
-    )
+@blueprint.get("/processes")
+@blueprint.input(schemas.ListPagination, location="query")
+@blueprint.output(schemas.ProcessList)
+def list_processes(query_data):
     api = flask.current_app.extensions["pygeoapi"]["api"]
-    api_response = api.list_processes(limit)
+    api_response = api.list_processes(query_data.get("limit"))
     if flask.current_app.config["PYGEOAPI"]["validate_responses"]:
         api.validate(api_response)
-    return api_response.as_dict()
+    return api_response
+
+
+@blueprint.get("/processes/<int:process_id>")
+def describe_process(process_id):
+    api = flask.current_app.extensions["pygeoapi"]["api"]
+    api_response = api.describe_process()

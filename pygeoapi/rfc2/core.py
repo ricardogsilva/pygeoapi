@@ -157,6 +157,9 @@ class Api:
         )
         return response
 
+    def describe_process(self, process_id: str) -> public.ProcessSummary:
+        ...
+
     def validate(self, response: public.PyGeoApiSchema):
         if self.schema_registry is not None:
             schema = self.schema_registry[response.schema_uri].contents

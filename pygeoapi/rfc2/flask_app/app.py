@@ -43,6 +43,7 @@ from .. import (
     config as pygeoapi_config,
     core,
 )
+
 from .blueprints.pygeoapi import blueprint as pygeoapi_blueprint
 from .blueprints.pygeoapi import (
     commands,
