@@ -18,6 +18,7 @@ from pathlib import Path
 from referencing import Registry
 from typing import (
     Callable,
+    Dict,
     List,
     Optional,
 )
@@ -44,9 +45,17 @@ class Api:
     process_manager: PyGeoApiProcessManager
     schema_registry: Optional[Registry]
     default_pagination_limit: int
-    conformance_classes: List[str] = [
-        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/req/core",
-    ]
+    conformance_classes: Dict[str, List[str]] = {
+        "ogcapi-features": [],
+        "ogcapi-processes": [
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/job-list",
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
+        ],
+    }
 
     def __init__(
             self,
@@ -84,11 +93,6 @@ class Api:
         response = public.LandingPage(
             title=self.identification.title,
             description=self.identification.description,
-            # title="My super duper pygeoapi POC",
-            # description=(
-            #     "This is a proof of concept showing a core architecture for "
-            #     "pygeoapi that does not depend on HTTP semantics"
-            # )
         )
         if url_resolver is not None:
             response.links.extend(
@@ -107,7 +111,7 @@ class Api:
                     ),
                     public.Link(
                         href=url_resolver(self.get_conformance),
-                        rel="conformance",
+                        rel="http://www.opengis.net/def/rel/ogc/1.0/conformance",
                         title="Conformance",
                         type="application/json"
                     ),
@@ -134,7 +138,16 @@ class Api:
         return response
 
     def get_conformance(self) -> public.Conformance:
-        return public.Conformance(conformsTo=self.conformance_classes)
+        result = public.Conformance()
+        for spec, conformance_classes in self.conformance_classes.items():
+            result.conformsTo.extend(conformance_classes)
+        return result
+
+    def get_api_definition(self):
+        ...
+
+    def get_api_docs(self):
+        ...
 
     def list_processes(self, limit: Optional[int] = None) -> public.ProcessList:
         response = public.ProcessList()
