@@ -193,12 +193,17 @@ def pre_process(func):
     """
 
     def inner(*args):
-        cls, req_in = args[:2]
-        req_out = APIRequest.with_data(req_in, getattr(cls, 'locales', set()))
+        api_instance, req_in = args[:2]
+        req_out = APIRequest.with_data(
+            req_in,
+            getattr(api_instance, 'locales', set()),
+            default_media_type=api_instance.config.get(
+                'server', {}).get('mimetype', '')
+        )
         if len(args) > 2:
-            return func(cls, req_out, *args[2:])
+            return func(api_instance, req_out, *args[2:])
         else:
-            return func(cls, req_out)
+            return func(api_instance, req_out)
 
     return inner
 
@@ -306,8 +311,9 @@ class APIRequest:
     :param request:             The web platform specific Request instance.
     :param supported_locales:   List or set of supported Locale instances.
     """
-    def __init__(self, request, supported_locales):
+    def __init__(self, request, supported_locales, default_media_type: str):
         # Set default request data
+        self.default_media_type = default_media_type
         self._data = b''
 
         # Copy request query parameters
@@ -332,7 +338,13 @@ class APIRequest:
         self._headers = self.get_request_headers(request.headers)
 
     @classmethod
-    def with_data(cls, request, supported_locales) -> 'APIRequest':
+    def with_data(
+            cls,
+            request,
+            supported_locales,
+            *,
+            default_media_type: str
+    ) -> 'APIRequest':
         """
         Factory class method to create an `APIRequest` instance with data.
 
@@ -348,7 +360,7 @@ class APIRequest:
         :returns:                   An `APIRequest` instance with data.
         """
 
-        api_req = cls(request, supported_locales)
+        api_req = cls(request, supported_locales, default_media_type)
         if hasattr(request, 'data'):
             # Set data from Flask request
             api_req._data = request.data
@@ -445,6 +457,8 @@ class APIRequest:
         # Format not specified: get from Accept headers (MIME types)
         # e.g. format_ = 'text/html'
         h = headers.get('accept', headers.get('Accept', '')).strip() # noqa
+        if h == '' or h.startswith('*'):
+            h = self.default_media_type
         (fmts, mimes) = zip(*FORMAT_TYPES.items())
         # basic support for complex types (i.e. with "q=0.x")
         for type_ in (t.split(';')[0].strip() for t in h.split(',') if t):
@@ -452,7 +466,9 @@ class APIRequest:
                 idx_ = mimes.index(type_)
                 format_ = fmts[idx_]
                 break
-
+        else:
+            LOGGER.warning(
+                f'Could not find format for supplied media type of {h!r}')
         return format_ or None
 
     @property
@@ -2862,7 +2878,7 @@ class API:
         query_args = {
             'crs': 'CRS84'
         }
-
+        # TODO: check if request.format is the default, and in that case assign png, or something like that
         format_ = request.format or 'png'
         headers = request.get_response_headers(**self.api_headers)
         LOGGER.debug('Processing query parameters')

@@ -116,14 +116,14 @@ def test_apirequest(api_):
     # Test without (valid) locales
     with pytest.raises(ValueError):
         req = mock_request()
-        APIRequest(req, [])
-        APIRequest(req, None)
-        APIRequest(req, ['zz'])
+        APIRequest(req, [], 'application/json')
+        APIRequest(req, None, 'application/json')
+        APIRequest(req, ['zz'], 'application/json')
 
     # Test all supported formats from query args
     for f, mt in FORMAT_TYPES.items():
         req = mock_request({'f': f})
-        apireq = APIRequest(req, api_.locales)
+        apireq = APIRequest(req, api_.locales, 'application/json')
         assert apireq.is_valid()
         assert apireq.format == f
         assert apireq.get_response_headers()['Content-Type'] == mt
@@ -131,14 +131,14 @@ def test_apirequest(api_):
     # Test all supported formats from Accept header
     for f, mt in FORMAT_TYPES.items():
         req = mock_request(HTTP_ACCEPT=mt)
-        apireq = APIRequest(req, api_.locales)
+        apireq = APIRequest(req, api_.locales, 'application/json')
         assert apireq.is_valid()
         assert apireq.format == f
         assert apireq.get_response_headers()['Content-Type'] == mt
 
     # Test nonsense format
     req = mock_request({'f': 'foo'})
-    apireq = APIRequest(req, api_.locales)
+    apireq = APIRequest(req, api_.locales, 'application/json')
     assert not apireq.is_valid()
     assert apireq.format == 'foo'
     assert apireq.is_valid(('foo',))
@@ -147,9 +147,9 @@ def test_apirequest(api_):
 
     # Test without format
     req = mock_request()
-    apireq = APIRequest(req, api_.locales)
+    apireq = APIRequest(req, api_.locales, 'application/json')
     assert apireq.is_valid()
-    assert apireq.format is None
+    assert apireq.format == 'json'
     assert apireq.get_response_headers()['Content-Type'] == \
            FORMAT_TYPES[F_JSON]
     assert apireq.get_linkrel(F_JSON) == 'self'
@@ -158,7 +158,7 @@ def test_apirequest(api_):
     # Test complex format string
     hh = 'text/html,application/xhtml+xml,application/xml;q=0.9,'
     req = mock_request(HTTP_ACCEPT=hh)
-    apireq = APIRequest(req, api_.locales)
+    apireq = APIRequest(req, api_.locales, 'application/json')
     assert apireq.is_valid()
     assert apireq.format == F_HTML
     assert apireq.get_response_headers()['Content-Type'] == \
@@ -169,7 +169,7 @@ def test_apirequest(api_):
     # Test accept header with multiple valid formats
     hh = 'plain/text,application/ld+json,application/json;q=0.9,'
     req = mock_request(HTTP_ACCEPT=hh)
-    apireq = APIRequest(req, api_.locales)
+    apireq = APIRequest(req, api_.locales, 'application/json')
     assert apireq.is_valid()
     assert apireq.format == F_JSONLD
     assert apireq.get_response_headers()['Content-Type'] == \
@@ -179,7 +179,7 @@ def test_apirequest(api_):
 
     # Overrule HTTP content negotiation
     req = mock_request({'f': 'html'}, HTTP_ACCEPT='application/json')  # noqa
-    apireq = APIRequest(req, api_.locales)
+    apireq = APIRequest(req, api_.locales, 'application/json')
     assert apireq.is_valid()
     assert apireq.format == F_HTML
     assert apireq.get_response_headers()['Content-Type'] == \
@@ -188,7 +188,8 @@ def test_apirequest(api_):
     # Test data
     for d in (None, '', 'test', {'key': 'value'}):
         req = mock_request(data=d)
-        apireq = APIRequest.with_data(req, api_.locales)
+        apireq = APIRequest.with_data(
+            req, api_.locales, default_media_type='application/json')
         if not d:
             assert apireq.data == b''
         elif isinstance(d, dict):
@@ -208,28 +209,28 @@ def test_apirequest(api_):
     for lang_in, (lang_out, cl_out) in test_lang.items():
         # Using l query parameter
         req = mock_request({'lang': lang_in})
-        apireq = APIRequest(req, sup_lang)
+        apireq = APIRequest(req, sup_lang, 'application/json')
         assert apireq.raw_locale == lang_in
         assert apireq.locale.language == lang_out
         assert apireq.get_response_headers()['Content-Language'] == cl_out
 
         # Using Accept-Language header
         req = mock_request(HTTP_ACCEPT_LANGUAGE=lang_in)
-        apireq = APIRequest(req, sup_lang)
+        apireq = APIRequest(req, sup_lang, 'application/json')
         assert apireq.raw_locale == lang_in
         assert apireq.locale.language == lang_out
         assert apireq.get_response_headers()['Content-Language'] == cl_out
 
     # Test language override
     req = mock_request({'lang': 'fr'}, HTTP_ACCEPT_LANGUAGE='en_US')
-    apireq = APIRequest(req, sup_lang)
+    apireq = APIRequest(req, sup_lang, 'application/json')
     assert apireq.raw_locale == 'fr'
     assert apireq.locale.language == 'fr'
     assert apireq.get_response_headers()['Content-Language'] == 'fr-CA'
 
     # Test locale territory
     req = mock_request({'lang': 'en-GB'})
-    apireq = APIRequest(req, sup_lang)
+    apireq = APIRequest(req, sup_lang, 'application/json')
     assert apireq.raw_locale == 'en-GB'
     assert apireq.locale.language == 'en'
     assert apireq.locale.territory == 'US'
@@ -238,7 +239,7 @@ def test_apirequest(api_):
     # Test without Accept-Language header or 'lang' query parameter
     # (should return default language from YAML config)
     req = mock_request()
-    apireq = APIRequest(req, api_.locales)
+    apireq = APIRequest(req, api_.locales, 'application/json')
     assert apireq.raw_locale is None
     assert apireq.locale.language == api_.default_locale.language
     assert apireq.get_response_headers()['Content-Language'] == 'en-US'
@@ -246,7 +247,7 @@ def test_apirequest(api_):
     # Test without Accept-Language header or 'lang' query param
     # (should return first in custom list of languages)
     sup_lang = ('de', 'fr', 'en')
-    apireq = APIRequest(req, sup_lang)
+    apireq = APIRequest(req, sup_lang, 'application/json')
     assert apireq.raw_locale is None
     assert apireq.locale.language == 'de'
     assert apireq.get_response_headers()['Content-Language'] == 'de'
