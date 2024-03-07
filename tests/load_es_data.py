@@ -26,13 +26,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # =================================================================
-
 import json
+import os
 from pathlib import Path
 import sys
 
 from elasticsearch import Elasticsearch, helpers
-es = Elasticsearch('http://localhost:9200')
+es = Elasticsearch(os.getenv('ELASTICSEARCH_SERVER_URL', 'http://localhost:9200'))
 
 if len(sys.argv) < 3:
     print(f'Usage: {sys.argv[0]} <path/to/data.geojson> <id-field>')

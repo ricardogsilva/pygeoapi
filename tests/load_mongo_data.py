@@ -30,11 +30,12 @@
 # =================================================================
 
 import json
+import os
 import sys
 from pymongo import MongoClient
 from pymongo import GEOSPHERE
 
-monogourl = 'mongodb://localhost:27017/'
+monogourl = os.getenv('MONGO_DB_SERVER_URL', 'mongodb://localhost:27017/')
 mongodb = 'testdb'
 mongocollection = 'testplaces'
 

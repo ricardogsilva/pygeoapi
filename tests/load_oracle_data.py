@@ -1,10 +1,15 @@
+import os
 import oracledb
 
 oracle_user = "geo_test"
 oracle_pwd = "geo_test"
 oracle_tns = "XEPDB1"
 
-dsn = oracledb.makedsn("127.0.0.1", 1521, service_name=oracle_tns)
+dsn = oracledb.makedsn(
+    os.getenv("ORACLE_DB_HOST", "127.0.0.1"),
+    1521,
+    service_name=oracle_tns
+)
 
 conn = oracledb.connect(user=oracle_user, password=oracle_pwd, dsn=dsn)
 
