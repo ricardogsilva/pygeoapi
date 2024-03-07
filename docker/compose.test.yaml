@@ -1,0 +1,139 @@
+# compose file suitable for running integration tests in a local dev environment
+# This is meant to emulate the conditions found on pygeoapi's CI
+
+# initialization:
+#
+# 0 - Stand up this stack:
+#
+# docker compose -f docker/compose.test.yaml up --detach
+#
+# 1 - install pygeoapi dev and provider requirements:
+# docker exec -ti pygeoapi-integration-pygeoapi-1 pip3 install -r requirements-dev.txt -r requirements-provider.txt
+
+# 2 - Upgrade the elasticsearch-dsl package for version 8.x of elasticsearch
+# docker exec -ti pygeoapi-integration-pygeoapi-1 pip3 install 'elasticsearch-dsl>=8.0.0,<9.0.0'
+#
+# 3 - load postgis data:
+# docker exec -ti pygeoapi-integration-postgis-db-1 bash /data/load-postgres-datasets.sh
+#
+# 4 - load elasticsearch data:
+# docker exec -ti pygeoapi-integration-pygeoapi-1 python3 tests/load_es_data.py tests/data/ne_110m_populated_places_simple.geojson geonameid
+# docker exec -ti pygeoapi-integration-pygeoapi-1 python3 tests/load_es_data.py tests/cite/canada-hydat-daily-mean-02HC003.geojson IDENTIFIER
+#
+# 5 - load mongodb data:
+# docker exec -ti pygeoapi-integration-pygeoapi-1 python3 tests/load_mongo_data.py tests/data/ne_110m_populated_places_simple.geojson
+#
+# 6 - load oracle data:
+# docker exec -ti pygeoapi-integration-pygeoapi-1 python3 tests/load_oracle_data.py
+#
+# 5 - install GDAL in the pygeoapi container:
+# docker exec -ti pygeoapi-integration-pygeoapi-1 bash docker/install-gdal-python-bindings.sh
+
+#
+#
+# running tests:
+#
+# POSTGRESQL_PASSWORD=pass pytest -v tests/test_postgresql_provider.py
+#
+# docker exec -ti pygeoapi-integration-pygeoapi-1 bash -c 'POSTGRESQL_PASSWORD=pass pytest -v tests/test_postgresql_provider.py'
+
+name: pygeoapi-integration
+
+services:
+
+  pygeoapi:
+    image: 'ghcr.io/geopython/pygeoapi:${CURRENT_GIT_BRANCH:-latest}'
+    # need to install GDAL python bindings in it too - lets write a script for that, to be called ad-hoc
+    ports:
+      - target: 5000
+        published: 5000
+    environment:
+      PYGEOAPI_CONFIG: /pygeoapi/example-config.yml
+      PYGEOAPI_OPENAPI: /pygeoapi/example-openapi.yml
+      POSTGRESQL_PASSWORD: pass
+      ELASTICSEARCH_SERVER_URL: http://elasticsearch-server:9200
+      MONGO_DB_SERVER_URL: mongodb://mongo-db:27017/
+      ORACLE_DB_HOST: oracle-db
+    volumes:
+      - type: bind
+        source: $PWD
+        target: /pygeoapi
+    depends_on:
+      postgis-db:
+        condition: service_healthy
+      oracle-db:
+        condition: service_healthy
+    entrypoint: ['/bin/bash', '-c']
+    command: ['gunicorn --bind 0.0.0.0:5000 pygeoapi.flask_app:APP']
+
+  postgis-db:
+    image: 'postgis/postgis:16-3.4'
+    ports:
+      - target: 5432
+        # must be '5432', as that is what tests expect
+        published: 5432
+    volumes:
+      - postgis-db-data:/var/lib/postgresql/data
+      - type: bind
+        source: $PWD/tests/data
+        target: /data
+      - type: bind
+        source: $PWD/docker/load-postgres-datasets.sh
+        target: /data/load-postgres-datasets.sh
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # must be named 'test', as that is what tests expect
+      POSTGRES_DB: test
+      POSTGRES_PASSWORD: pass
+      # must be named 'postgres' otherwise loading of some test data fails
+      POSTGRES_USER: postgres
+    healthcheck:
+      interval: 10s
+      timeout: 3s
+      start_period: 1m
+      retries: 10
+      test: |
+        export PGPASSWORD=$${POSTGRES_PASSWORD:-}
+        args="--host 127.0.0.1 --username $${POSTGRES_USER} --dbname $${POSTGRES_DB} --quiet --no-align --tuples-only"
+        response=$$(echo 'SELECT 1' | psql $${args})
+        if [ $${response} = '1' ];
+        then exit 0;
+        else echo "+++++++++++++DB $${POSTGRES_DB} is not up+++++++++++++"; exit 1;
+        fi
+
+  elasticsearch-server:
+    image: elasticsearch:8.12.2
+    ports:
+      - target: 9200
+        published: 9200
+      - target: 9300
+        published: 9300
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: false
+      xpack.security.enrollment.enabled: false
+
+  mongo-db:
+    image: mongo:5.0.25
+    ports:
+      - target: 27017
+        published: 27017
+
+  oracle-db:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    environment:
+      ORACLE_PWD: oracle
+    ports:
+      - target: 1521
+        published: 1521
+    volumes:
+      - type: bind
+        source: $PWD/tests/data/oracle
+        target: /opt/oracle/scripts/startup
+
+
+#  sensor-things-api-server:
+
+
+volumes:
+  postgis-db-data:
