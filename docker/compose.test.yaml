@@ -61,8 +61,8 @@ services:
     depends_on:
       postgis-db:
         condition: service_healthy
-      oracle-db:
-        condition: service_healthy
+#      oracle-db:
+#        condition: service_healthy
     entrypoint: ['/bin/bash', '-c']
     command: ['gunicorn --bind 0.0.0.0:5000 pygeoapi.flask_app:APP']
 
@@ -119,20 +119,30 @@ services:
       - target: 27017
         published: 27017
 
-  oracle-db:
-    image: container-registry.oracle.com/database/express:21.3.0-xe
-    environment:
-      ORACLE_PWD: oracle
-    ports:
-      - target: 1521
-        published: 1521
-    volumes:
-      - type: bind
-        source: $PWD/tests/data/oracle
-        target: /opt/oracle/scripts/startup
+  sensor-things-api-server:
+    image: 'ghcr.io/cgs-earth/sensorthings-action:latest'
+    command:
+      - 'up'
+      - 'sensorthings'  # this is the table name
+      - 'sensorthingsuser'
+      - 'sensorthingspassword'
+
+#  the oracle DB service is not enabled by default as it makes the
+#  whole stack take a long time to stand up
+#
+#  oracle-db:
+#    image: container-registry.oracle.com/database/express:21.3.0-xe
+#    environment:
+#      ORACLE_PWD: oracle
+#    ports:
+#      - target: 1521
+#        published: 1521
+#    volumes:
+#      - type: bind
+#        source: $PWD/tests/data/oracle
+#        target: /opt/oracle/scripts/startup
 
 
-#  sensor-things-api-server:
 
 
 volumes:
