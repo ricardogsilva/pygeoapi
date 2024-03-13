@@ -1245,7 +1245,11 @@ class API:
 
             try:
                 tile = get_provider_by_type(v['providers'], 'tile')
-                p = load_plugin('provider', tile)
+                provider_config = {
+                    'validators': self.config.get('validators'),
+                    **tile
+                }
+                p = load_plugin('provider', provider_config)
             except ProviderConnectionError:
                 msg = 'connection error (check logs)'
                 return self.get_exception(
@@ -2755,7 +2759,11 @@ class API:
         try:
             t = get_provider_by_type(
                     self.config['resources'][dataset]['providers'], 'tile')
-            p = load_plugin('provider', t)
+            provider_config = {
+                'validators': self.config.get('validators'),
+                **t
+            }
+            p = load_plugin('provider', provider_config)
         except (KeyError, ProviderTypeError):
             msg = 'Invalid collection tiles'
             return self.get_exception(
@@ -2888,7 +2896,11 @@ class API:
         try:
             t = get_provider_by_type(
                 self.config['resources'][dataset]['providers'], 'tile')
-            p = load_plugin('provider', t)
+            provider_config = {
+                'validators': self.config.get('validators'),
+                **t
+            }
+            p = load_plugin('provider', provider_config)
 
             format_ = p.format_type
             headers['Content-Type'] = format_
@@ -2947,7 +2959,11 @@ class API:
         try:
             t = get_provider_by_type(
                 self.config['resources'][dataset]['providers'], 'tile')
-            p = load_plugin('provider', t)
+            provider_config = {
+                'validators': self.config.get('validators'),
+                **t
+            }
+            p = load_plugin('provider', provider_config)
         except KeyError:
             msg = 'Invalid collection tiles'
             return self.get_exception(
