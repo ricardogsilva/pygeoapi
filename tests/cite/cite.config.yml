@@ -1,8 +1,8 @@
 server:
     bind:
         host: 0.0.0.0
-        port: 5001
-    url: http://localhost:5001
+        port: ${PYGEOAPI_PORT:-5001}
+    url: ${PYGEOAPI_PUBLIC_URL:-http://localhost:5001}
     mimetype: application/json; charset=UTF-8
     encoding: utf-8
     language: en-US
@@ -100,7 +100,7 @@ resources:
         providers:
             - type: feature
               name: Elasticsearch
-              data: http://localhost:9200/canada-hydat-daily-mean-02hc003
+              data: ${PYGEOAPI_ELASTICSEARCH_SERVER_URL:-http://localhost:9200}/canada-hydat-daily-mean-02hc003
               id_field: IDENTIFIER
               time_field: DATE
 
