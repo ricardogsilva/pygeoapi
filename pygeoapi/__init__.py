@@ -38,8 +38,16 @@ try:
     from importlib.metadata import entry_points
 except ImportError:
     from importlib_metadata import entry_points
-from pygeoapi.config import config
+
+import pygeoapi.openapi
+from pygeoapi import flask_application
+from pygeoapi.api import API
+from pygeoapi.config import (
+    config,
+    get_config,
+)
 from pygeoapi.openapi import openapi
+
 
 
 def _find_plugins():
@@ -98,6 +106,16 @@ def serve(ctx, server):
     if server == "flask":
         from pygeoapi.flask_app import serve as serve_flask
         ctx.invoke(serve_flask)
+    elif server == 'flask_application':
+        pygeoapi_config = get_config()
+        openapi_document = pygeoapi.openapi.load_openapi_document()
+        pygeoapi_api = API(pygeoapi_config, openapi_document)
+        app = flask_application.get_app(pygeoapi_api)
+        app.run(
+            debug=True,
+            host=app.config['server']['bind']['host'],
+            port=app.config['server']['bind']['port'])
+
     elif server == "starlette":
         from pygeoapi.starlette_app import serve as serve_starlette
         ctx.invoke(serve_starlette)
