@@ -103,6 +103,8 @@ def plugins():
 @click.option('--flask', 'server', flag_value="flask", default=True)
 @click.option('--starlette', 'server', flag_value="starlette")
 @click.option('--django', 'server', flag_value="django")
+@click.option('--flask-application', 'server', flag_value="flask_application")
+@click.option('--starlette-application', 'server', flag_value="starlette_application")
 @click.pass_context
 def serve(ctx, server):
     """Run the server with different daemon type (--flask is the default)"""
@@ -117,8 +119,8 @@ def serve(ctx, server):
         app = flask_application.get_app_from_pygeoapi_api(pygeoapi_api)
         app.run(
             debug=True,
-            host=app.config['pygeoapi']['api'].config['server']['bind']['host'],
-            port=app.config['pygeoapi']['api'].config['server']['bind']['port']
+            host=app.extensions['pygeoapi']['api'].config['server']['bind']['host'],
+            port=app.extensions['pygeoapi']['api'].config['server']['bind']['port']
         )
     elif server == "starlette":
         from pygeoapi.starlette_app import serve as serve_starlette

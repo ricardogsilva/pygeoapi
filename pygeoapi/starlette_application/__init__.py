@@ -5,7 +5,10 @@ from typing import Optional
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.routing import Mount
+from starlette.routing import (
+    Mount,
+    Route,
+)
 from starlette.staticfiles import StaticFiles
 
 from pygeoapi.api import API
@@ -59,6 +62,19 @@ def get_app_from_pygeoapi_api(pygeoapi_api: API) -> Starlette:
         # Starlette does not allow this, so for consistency we'll add a static
         # mount here WITHOUT the URL prefix (due to router order).
         routes.append(Mount('/static', StaticFiles(directory=static_dir)))
+
+    ogc_schemas_location = pygeoapi_api.config['server'].get(
+        'ogc_schemas_location')
+    if (
+            ogc_schemas_location is not None
+            and not ogc_schemas_location.startswith('http')
+    ):
+        schemas_path = Path(ogc_schemas_location)
+        if not schemas_path.exists():
+            raise RuntimeError('OGC schemas misconfigured')
+        routes.append(
+            Route(f'{url_prefix}/schemas', StaticFiles(directory=schemas_path))
+        )
 
     middleware = []
     # CORS: optionally enable from config.

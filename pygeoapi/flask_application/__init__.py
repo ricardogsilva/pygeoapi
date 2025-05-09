@@ -1,12 +1,13 @@
 """pygeoapi flask application"""
+from pathlib import Path
+
 import flask
 
 from pygeoapi.api import API
 from pygeoapi.config import get_config
+from pygeoapi.flask_application.pygeoapi_extension import PygeoapiFlaskExtension
 from pygeoapi.openapi import load_openapi_document
 from pygeoapi.util import get_api_rules
-
-from pygeoapi.flask_application.pygeoapi_extension import PygeoapiFlaskExtension
 
 
 def get_app():
@@ -17,10 +18,10 @@ def get_app():
 
 
 def get_app_from_pygeoapi_api(pygeoapi_api: API) -> flask.Flask:
-    static_folder = 'static'
-    if 'templates' in pygeoapi_api.config['server']:
-        static_folder = pygeoapi_api.config['server']['templates'].get(
-            'static', 'static')
+    static_folder = pygeoapi_api.config['server'].get(
+        'static_directory',
+        Path(__file__).parents[1] / 'static'
+    )
     app = flask.Flask(
         __name__,
         static_folder=static_folder,

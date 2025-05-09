@@ -17,7 +17,7 @@ def schemas(path):
     :returns: HTTP response
     """
 
-    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
+    pygeoapi_api = flask.current_app.extensions['pygeoapi']['api']
     ogc_schemas_location = pygeoapi_api.config['server'].get('ogc_schemas_location')
     full_filepath = os.path.join(ogc_schemas_location, path)
     dirname_ = os.path.dirname(full_filepath)

@@ -32,7 +32,7 @@ def landing_page():
     :returns: HTTP response
     """
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.landing_page,
         flask.request
     )
@@ -47,7 +47,7 @@ def openapi():
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.openapi_,
         flask.request
     )
@@ -62,7 +62,7 @@ def conformance():
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.conformance,
         flask.request
     )
@@ -79,7 +79,7 @@ def get_tilematrix_set(tileMatrixSetId=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.tiles.tilematrixset,
         flask.request,
         tileMatrixSetId,
@@ -95,7 +95,7 @@ def get_tilematrix_sets():
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.tiles.tilematrixsets,
         flask.request
     )
@@ -113,7 +113,7 @@ def collections(collection_id=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.describe_collections,
         flask.request,
         collection_id
@@ -131,7 +131,7 @@ def collection_schema(collection_id):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.get_collection_schema,
         flask.request,
         collection_id
@@ -149,7 +149,7 @@ def collection_queryables(collection_id=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.itemtypes.get_collection_queryables,
         flask.request,
         collection_id
@@ -172,7 +172,7 @@ def collection_items(collection_id, item_id=None):
     :returns: HTTP response
     """
 
-    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
+    pygeoapi_api = flask.current_app.extensions['pygeoapi']['api']
     if item_id is None:
         if flask.request.method == 'POST':  # filter or manage items
             if flask.request.content_type is not None:
@@ -262,7 +262,7 @@ def collection_coverage(collection_id):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.coverages.get_collection_coverage,
         flask.request,
         collection_id,
@@ -281,7 +281,7 @@ def get_collection_tiles(collection_id=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.tiles.get_collection_tiles,
         flask.request,
         collection_id
@@ -301,7 +301,7 @@ def get_collection_tiles_metadata(collection_id=None, tileMatrixSetId=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.tiles.get_collection_tiles_metadata,
         flask.request,
         collection_id,
@@ -327,7 +327,7 @@ def get_collection_tiles_data(collection_id=None, tileMatrixSetId=None,
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.tiles.get_collection_tiles_data,
         flask.request, collection_id, tileMatrixSetId, tileMatrix,
         tileRow, tileCol,
@@ -348,7 +348,7 @@ def collection_map(collection_id, style_id=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.maps.get_collection_map,
         flask.request, collection_id, style_id
     )
@@ -366,7 +366,7 @@ def get_processes(process_id=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.processes.describe_processes,
         flask.request,
         process_id
@@ -385,7 +385,7 @@ def get_jobs(job_id=None):
     :returns: HTTP response
     """
 
-    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
+    pygeoapi_api = flask.current_app.extensions['pygeoapi']['api']
     if job_id is None:
         return execute_from_flask(
             pygeoapi_api, pygeoapi.api.processes.get_jobs, flask.request)
@@ -413,7 +413,7 @@ def execute_process_jobs(process_id):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.processes.execute_process,
         flask.request,
         process_id
@@ -432,7 +432,7 @@ def get_job_result(job_id=None):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.processes.get_job_result,
         flask.request,
         job_id
@@ -469,7 +469,7 @@ def get_collection_edr_query(collection_id, instance_id=None,
     :returns: HTTP response
     """
 
-    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
+    pygeoapi_api = flask.current_app.extensions['pygeoapi']['api']
     if (flask.request.path.endswith('instances') or
             (instance_id is not None and
              flask.request.path.endswith(instance_id))):
@@ -503,7 +503,7 @@ def stac_catalog_root():
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.stac.get_stac_root,
         flask.request
     )
@@ -520,7 +520,7 @@ def stac_catalog_path(path):
     """
 
     return execute_from_flask(
-        flask.current_app.config['pygeoapi']['api'],
+        flask.current_app.extensions['pygeoapi']['api'],
         pygeoapi.api.stac.get_stac_path,
         flask.request,
         path

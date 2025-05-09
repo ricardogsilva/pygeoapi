@@ -28,20 +28,20 @@ def admin_config():
 
     if flask.request.method == 'GET':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.get_config_,
             flask.request
         )
 
     elif flask.request.method == 'PUT':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.put_config, flask.request,
         )
 
     elif flask.request.method == 'PATCH':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.patch_config,
             flask.request,
         )
@@ -57,12 +57,12 @@ def admin_config_resources():
 
     if flask.request.method == 'GET':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.get_resources, flask.request)
 
     elif flask.request.method == 'POST':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.post_resource, flask.request)
 
 
@@ -78,7 +78,7 @@ def admin_config_resource(resource_id):
 
     if flask.request.method == 'GET':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.get_resource,
             flask.request,
             resource_id
@@ -86,7 +86,7 @@ def admin_config_resource(resource_id):
 
     elif flask.request.method == 'DELETE':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.delete_resource,
             flask.request,
             resource_id
@@ -94,7 +94,7 @@ def admin_config_resource(resource_id):
 
     elif flask.request.method == 'PUT':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.put_resource,
             flask.request,
             resource_id
@@ -102,7 +102,7 @@ def admin_config_resource(resource_id):
 
     elif flask.request.method == 'PATCH':
         return execute_from_flask(
-            flask.current_app.config['pygeoapi']['admin_api'],
+            flask.current_app.extensions['pygeoapi']['admin_api'],
             pygeoapi.admin.patch_resource,
             flask.request,
             resource_id
