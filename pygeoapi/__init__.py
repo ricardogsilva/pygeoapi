@@ -39,14 +39,18 @@ try:
 except ImportError:
     from importlib_metadata import entry_points
 
-import pygeoapi.openapi
+import uvicorn
+
 from pygeoapi import flask_application
 from pygeoapi.api import API
 from pygeoapi.config import (
     config,
     get_config,
 )
-from pygeoapi.openapi import openapi
+from pygeoapi.openapi import (
+    load_openapi_document,
+    openapi,
+)
 
 
 
@@ -102,23 +106,34 @@ def plugins():
 @click.pass_context
 def serve(ctx, server):
     """Run the server with different daemon type (--flask is the default)"""
+    pygeoapi_api = API(
+        config=get_config(), openapi=load_openapi_document()
+    )
 
     if server == "flask":
         from pygeoapi.flask_app import serve as serve_flask
         ctx.invoke(serve_flask)
     elif server == 'flask_application':
-        pygeoapi_config = get_config()
-        openapi_document = pygeoapi.openapi.load_openapi_document()
-        pygeoapi_api = API(pygeoapi_config, openapi_document)
-        app = flask_application.get_app(pygeoapi_api)
+        app = flask_application.get_app_from_pygeoapi_api(pygeoapi_api)
         app.run(
             debug=True,
-            host=app.config['server']['bind']['host'],
-            port=app.config['server']['bind']['port'])
-
+            host=app.config['pygeoapi']['api'].config['server']['bind']['host'],
+            port=app.config['pygeoapi']['api'].config['server']['bind']['port']
+        )
     elif server == "starlette":
         from pygeoapi.starlette_app import serve as serve_starlette
         ctx.invoke(serve_starlette)
+    elif server == "starlette_application":
+        log_level = 'info'
+        if pygeoapi_api.config['server'].get('debug', False):
+            log_level = 'debug'
+        uvicorn.run(
+            "pygeoapi.starlette_application:get_app",
+            reload=True,
+            log_level=log_level,
+            loop='asyncio',
+            host=pygeoapi_api.config['server']['bind']['host'],
+            port=pygeoapi_api.config['server']['bind']['port'])
     elif server == "django":
         from pygeoapi.django_app import main as serve_django
         ctx.invoke(serve_django)

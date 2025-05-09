@@ -1,17 +1,27 @@
 import flask
 
 import pygeoapi.api
+import pygeoapi.api.coverages
+import pygeoapi.api.environmental_data_retrieval
 import pygeoapi.api.itemtypes
+import pygeoapi.api.maps
+import pygeoapi.api.processes
+import pygeoapi.api.stac
 import pygeoapi.api.tiles
 from pygeoapi.flask_application.pygeoapi_extension.views.util import execute_from_flask
 
 blueprint = flask.Blueprint('pygeoapi', __name__)
 
 
-def configure_blueprint(static_folder: str, url_prefix: str) -> None:
+def configure_blueprint(
+        pygeoapi_api: pygeoapi.api.API,  # noqa
+        static_folder: str,
+        url_prefix: str
+) -> None:
     global blueprint
     blueprint.static_folder = static_folder
     blueprint.url_prefix = url_prefix
+    # enable/disable blueprint routes based on the pygeoapi_config
 
 
 @blueprint.route('/')
@@ -162,42 +172,83 @@ def collection_items(collection_id, item_id=None):
     :returns: HTTP response
     """
 
+    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
     if item_id is None:
-        if request.method == 'POST':  # filter or manage items
-            if request.content_type is not None:
-                if request.content_type == 'application/geo+json':
+        if flask.request.method == 'POST':  # filter or manage items
+            if flask.request.content_type is not None:
+                if flask.request.content_type == 'application/geo+json':
                     return execute_from_flask(
-                        itemtypes_api.manage_collection_item,
-                        request, 'create', collection_id,
-                        skip_valid_check=True)
+                        pygeoapi_api,
+                        pygeoapi.api.itemtypes.manage_collection_item,
+                        flask.request,
+                        'create',
+                        collection_id,
+                        skip_valid_check=True
+                    )
                 else:
                     return execute_from_flask(
-                        itemtypes_api.get_collection_items, request,
-                        collection_id, skip_valid_check=True)
-        elif request.method == 'OPTIONS':
+                        pygeoapi_api,
+                        pygeoapi.api.itemtypes.get_collection_items,
+                        flask.request,
+                        collection_id,
+                        skip_valid_check=True
+                    )
+        elif flask.request.method == 'OPTIONS':
             return execute_from_flask(
-                itemtypes_api.manage_collection_item, request, 'options',
-                collection_id, skip_valid_check=True)
+                pygeoapi_api,
+                pygeoapi.api.itemtypes.manage_collection_item,
+                flask.request,
+                'options',
+                collection_id,
+                skip_valid_check=True
+            )
         else:  # GET: list items
-            return execute_from_flask(itemtypes_api.get_collection_items,
-                                      request, collection_id,
-                                      skip_valid_check=True)
+            return execute_from_flask(
+                pygeoapi_api,
+                pygeoapi.api.itemtypes.get_collection_items,
+                flask.request,
+                collection_id,
+                skip_valid_check=True
+            )
 
-    elif request.method == 'DELETE':
-        return execute_from_flask(itemtypes_api.manage_collection_item,
-                                  request, 'delete', collection_id, item_id,
-                                  skip_valid_check=True)
-    elif request.method == 'PUT':
-        return execute_from_flask(itemtypes_api.manage_collection_item,
-                                  request, 'update', collection_id, item_id,
-                                  skip_valid_check=True)
-    elif request.method == 'OPTIONS':
-        return execute_from_flask(itemtypes_api.manage_collection_item,
-                                  request, 'options', collection_id, item_id,
-                                  skip_valid_check=True)
+    elif flask.request.method == 'DELETE':
+        return execute_from_flask(
+            pygeoapi_api,
+            pygeoapi.api.itemtypes.manage_collection_item,
+            flask.request,
+            'delete',
+            collection_id,
+            item_id,
+            skip_valid_check=True
+        )
+    elif flask.request.method == 'PUT':
+        return execute_from_flask(
+            pygeoapi_api,
+            pygeoapi.api.itemtypes.manage_collection_item,
+            flask.request,
+            'update',
+            collection_id,
+            item_id,
+            skip_valid_check=True
+        )
+    elif flask.request.method == 'OPTIONS':
+        return execute_from_flask(
+            pygeoapi_api,
+            pygeoapi.api.itemtypes.manage_collection_item,
+            flask.request,
+            'options',
+            collection_id,
+            item_id,
+            skip_valid_check=True
+        )
     else:
-        return execute_from_flask(itemtypes_api.get_collection_item, request,
-                                  collection_id, item_id)
+        return execute_from_flask(
+            pygeoapi_api,
+            pygeoapi.api.itemtypes.get_collection_item,
+            flask.request,
+            collection_id,
+            item_id
+        )
 
 
 @blueprint.route('/collections/<path:collection_id>/coverage')
@@ -210,8 +261,13 @@ def collection_coverage(collection_id):
     :returns: HTTP response
     """
 
-    return execute_from_flask(coverages_api.get_collection_coverage, request,
-                              collection_id, skip_valid_check=True)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.coverages.get_collection_coverage,
+        flask.request,
+        collection_id,
+        skip_valid_check=True
+    )
 
 
 @blueprint.route('/collections/<path:collection_id>/tiles')
@@ -224,8 +280,12 @@ def get_collection_tiles(collection_id=None):
     :returns: HTTP response
     """
 
-    return execute_from_flask(tiles_api.get_collection_tiles, request,
-                              collection_id)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.tiles.get_collection_tiles,
+        flask.request,
+        collection_id
+    )
 
 
 @blueprint.route('/collections/<path:collection_id>/tiles/<tileMatrixSetId>')
@@ -240,9 +300,14 @@ def get_collection_tiles_metadata(collection_id=None, tileMatrixSetId=None):
     :returns: HTTP response
     """
 
-    return execute_from_flask(tiles_api.get_collection_tiles_metadata,
-                              request, collection_id, tileMatrixSetId,
-                              skip_valid_check=True)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.tiles.get_collection_tiles_metadata,
+        flask.request,
+        collection_id,
+        tileMatrixSetId,
+        skip_valid_check=True
+    )
 
 
 @blueprint.route('/collections/<path:collection_id>/tiles/\
@@ -262,8 +327,10 @@ def get_collection_tiles_data(collection_id=None, tileMatrixSetId=None,
     """
 
     return execute_from_flask(
-        tiles_api.get_collection_tiles_data,
-        request, collection_id, tileMatrixSetId, tileMatrix, tileRow, tileCol,
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.tiles.get_collection_tiles_data,
+        flask.request, collection_id, tileMatrixSetId, tileMatrix,
+        tileRow, tileCol,
         skip_valid_check=True,
     )
 
@@ -281,7 +348,9 @@ def collection_map(collection_id, style_id=None):
     """
 
     return execute_from_flask(
-        maps_api.get_collection_map, request, collection_id, style_id
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.maps.get_collection_map,
+        flask.request, collection_id, style_id
     )
 
 
@@ -296,8 +365,12 @@ def get_processes(process_id=None):
     :returns: HTTP response
     """
 
-    return execute_from_flask(processes_api.describe_processes, request,
-                              process_id)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.processes.describe_processes,
+        flask.request,
+        process_id
+    )
 
 
 @blueprint.route('/jobs')
@@ -312,14 +385,21 @@ def get_jobs(job_id=None):
     :returns: HTTP response
     """
 
+    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
     if job_id is None:
-        return execute_from_flask(processes_api.get_jobs, request)
+        return execute_from_flask(
+            pygeoapi_api, pygeoapi.api.processes.get_jobs, flask.request)
     else:
-        if request.method == 'DELETE':  # dismiss job
-            return execute_from_flask(processes_api.delete_job, request,
-                                      job_id)
+        if flask.request.method == 'DELETE':  # dismiss job
+            return execute_from_flask(
+                pygeoapi_api, pygeoapi.api.processes.delete_job,
+                flask.request,job_id
+            )
         else:  # Return status of a specific job
-            return execute_from_flask(processes_api.get_jobs, request, job_id)
+            return execute_from_flask(
+                pygeoapi_api, pygeoapi.api.processes.get_jobs,
+                flask.request, job_id
+            )
 
 
 @blueprint.route('/processes/<process_id>/execution', methods=['POST'])
@@ -332,8 +412,12 @@ def execute_process_jobs(process_id):
     :returns: HTTP response
     """
 
-    return execute_from_flask(processes_api.execute_process, request,
-                              process_id)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.processes.execute_process,
+        flask.request,
+        process_id
+    )
 
 
 @blueprint.route('/jobs/<job_id>/results',
@@ -347,7 +431,12 @@ def get_job_result(job_id=None):
     :returns: HTTP response
     """
 
-    return execute_from_flask(processes_api.get_job_result, request, job_id)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.processes.get_job_result,
+        flask.request,
+        job_id
+    )
 
 
 @blueprint.route('/collections/<path:collection_id>/position')
@@ -380,21 +469,27 @@ def get_collection_edr_query(collection_id, instance_id=None,
     :returns: HTTP response
     """
 
-    if (request.path.endswith('instances') or
+    pygeoapi_api = flask.current_app.config['pygeoapi']['api']
+    if (flask.request.path.endswith('instances') or
             (instance_id is not None and
-             request.path.endswith(instance_id))):
+             flask.request.path.endswith(instance_id))):
         return execute_from_flask(
-            edr_api.get_collection_edr_instances, request, collection_id,
+            pygeoapi_api,
+            pygeoapi.api.environmental_data_retrieval.get_collection_edr_instances,
+            flask.request,
+            collection_id,
             instance_id
         )
 
     if location_id:
         query_type = 'locations'
     else:
-        query_type = request.path.split('/')[-1]
+        query_type = flask.request.path.split('/')[-1]
 
     return execute_from_flask(
-        edr_api.get_collection_edr_query, request, collection_id, instance_id,
+        pygeoapi_api,
+        pygeoapi.api.environmental_data_retrieval.get_collection_edr_query,
+        flask.request, collection_id, instance_id,
         query_type, location_id, skip_valid_check=True
     )
 
@@ -407,7 +502,11 @@ def stac_catalog_root():
     :returns: HTTP response
     """
 
-    return execute_from_flask(stac_api.get_stac_root, request)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.stac.get_stac_root,
+        flask.request
+    )
 
 
 @blueprint.route('/stac/<path:path>')
@@ -420,4 +519,9 @@ def stac_catalog_path(path):
     :returns: HTTP response
     """
 
-    return execute_from_flask(stac_api.get_stac_path, request, path)
+    return execute_from_flask(
+        flask.current_app.config['pygeoapi']['api'],
+        pygeoapi.api.stac.get_stac_path,
+        flask.request,
+        path
+    )
