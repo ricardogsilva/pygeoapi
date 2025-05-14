@@ -55,6 +55,7 @@ from dateutil.parser import parse as dateparse
 import pytz
 
 from pygeoapi import __version__, l10n
+from pygeoapi.conf.protocols import ConfigurationManager
 from pygeoapi.linked_data import jsonldify, jsonldify_collection
 from pygeoapi.log import setup_logger
 from pygeoapi.plugin import load_plugin
@@ -526,7 +527,7 @@ class APIRequest:
 class API:
     """API object"""
 
-    def __init__(self, config, openapi):
+    def __init__(self, config: ConfigurationManager, openapi):
         """
         constructor
 
@@ -562,7 +563,7 @@ class API:
         setup_logger(self.config['logging'])
 
         # Create config clone for HTML templating with modified base URL
-        self.tpl_config = deepcopy(self.config)
+        self.tpl_config = self.config.as_dict()
         self.tpl_config['server']['url'] = self.base_url
 
         self.manager = get_manager(self.config)

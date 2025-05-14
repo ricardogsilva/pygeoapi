@@ -1,20 +1,24 @@
 """pygeoapi flask application"""
+import os
 from pathlib import Path
 
 import flask
 
 from pygeoapi.api import API
-from pygeoapi.config import get_config
+from pygeoapi.conf import PygeoapiConfiguration
 from pygeoapi.flask_application.pygeoapi_extension import PygeoapiFlaskExtension
-from pygeoapi.openapi import load_openapi_document
+from pygeoapi.openapi import get_oas
 from pygeoapi.util import get_api_rules
 
 
 def get_app():
-    pygeoapi_config = get_config()
-    openapi_document = load_openapi_document()
-    pygeoapi_api = API(pygeoapi_config, openapi_document)
-    return get_app_from_pygeoapi_api(pygeoapi_api)
+    if (config_path := os.getenv('PYGEOAPI_CONFIG')) is not None:
+        pygeoapi_config = PygeoapiConfiguration.from_configuration_file(config_path)
+        openapi_document = get_oas(pygeoapi_config)
+        pygeoapi_api = API(pygeoapi_config, openapi_document)
+        return get_app_from_pygeoapi_api(pygeoapi_api)
+    else:
+        raise RuntimeError('PYGEOAPI_CONFIG environment variable not set')
 
 
 def get_app_from_pygeoapi_api(pygeoapi_api: API) -> flask.Flask:
