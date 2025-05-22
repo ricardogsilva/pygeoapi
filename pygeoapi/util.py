@@ -33,6 +33,7 @@ import base64
 from copy import deepcopy
 from filelock import FileLock
 import functools
+import importlib
 from functools import partial
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
@@ -972,6 +973,13 @@ def modify_pygeofilter(
     if geometry_column_name:
         _inplace_replace_geometry_filter_name(new_tree, geometry_column_name)
     return new_tree
+
+
+def import_object(object_path: str) -> object:
+    """Import an object from the given Python path."""
+    module_path, object_name = object_path.rpartition('.')[::2]
+    imported_module = importlib.import_module(module_path)
+    return getattr(imported_module, object_name)
 
 
 def _inplace_transform_filter_geometries(

@@ -1,6 +1,7 @@
 """pygeoapi configuration management utilities."""
 
 import dataclasses
+import os
 from pathlib import Path
 from typing import (
     Any,
@@ -210,7 +211,8 @@ class PygeoapiMetadataConfiguration:
     def __getitem__(self, key: str) -> (
             PygeoapiMetadataIdentificationConfiguration |
             PygeoapiMetadataLicenseConfiguration |
-            PygeoapiMetadataProviderConfiguration
+            PygeoapiMetadataProviderConfiguration |
+            PygeoapiMetadataContactConfiguration
     ):
         try:
             return getattr(self, key)
@@ -516,7 +518,9 @@ class PygeoapiConfiguration:
             raise KeyError() from exc
 
     @classmethod
-    def from_configuration_file(cls, configuration_file_path: str):
+    def from_configuration_file(
+            cls, configuration_file_path: str
+    ) -> 'PygeoapiConfiguration':
         if (conf_path := Path(configuration_file_path)).exists():
             with conf_path.open('r', encoding='utf-8') as fh:
                 raw_conf = yaml_load(fh)
@@ -528,6 +532,13 @@ class PygeoapiConfiguration:
             )
         else:
             raise RuntimeError(f'Configuration file {configuration_file_path} does not exist')
+
+    @classmethod
+    def from_env_variable(cls) -> 'PygeoapiConfiguration':
+        if (config_path := os.getenv('PYGEOAPI_CONFIG')) is not None:
+            return cls.from_configuration_file(config_path)
+        else:
+            raise RuntimeError('PYGEOAPI_CONFIG environment variable not set')
 
     def get(self, key: str, default: Any = None) -> Any:
         try:
