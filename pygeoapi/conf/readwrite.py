@@ -341,16 +341,13 @@ class PygeoapiSharedServerConfiguration:
 
 
 class PygeoapiSharedConfiguration:
-    """Implementation of ConfigurationManager that shares state across processes.
+    """ConfigurationManager implementation that shares state across processes.
     """
 
     metadata: PygeoapiSharedMetadataConfiguration
     logging: PygeoapiLoggingConfiguration
     server: PygeoapiSharedServerConfiguration
     # resources: dict[str, Any]
-
-    _metadata_conf_dict: DictProxy[str, str]
-    _server_conf_dict: DictProxy[str, str]
 
     def __init__(
             self,
@@ -404,11 +401,13 @@ class PygeoapiSharedConfiguration:
 
             return cls(
                 metadata=metadata_conf,
-                logging=PygeoapiLoggingConfiguration.from_dict(raw_conf['logging']),
+                logging=PygeoapiLoggingConfiguration.from_dict(
+                    raw_conf['logging']),
                 server=server_conf,
             )
         else:
-            raise RuntimeError(f'Configuration file {configuration_file_path} does not exist')
+            raise RuntimeError(
+                f'Configuration file {configuration_file_path} does not exist')
 
     @classmethod
     def from_env_variable(cls) -> 'PygeoapiSharedConfiguration':
