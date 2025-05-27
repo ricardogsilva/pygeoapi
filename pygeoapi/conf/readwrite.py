@@ -12,10 +12,6 @@ from typing import (
 )
 
 from pygeoapi.util import yaml_load
-from pygeoapi.conf import (
-    PygeoapiLoggingConfiguration,
-    PygeoapiServerBindConfiguration,
-)
 
 
 manager = Manager()
@@ -30,8 +26,49 @@ shared_server_process_manager_config = manager.dict()
 shared_resources_config = manager.dict()
 
 
+class SharedAttributeRead:
+    _shared_state: DictProxy[str, Any]
 
-class PygeoapiSharedMetadataIdentificationConfiguration:
+    def __getattr__(self, item: str) -> (
+            str | dict[str, str | dict[str, str | list[str]]]
+    ):
+        try:
+            return self._shared_state[item]
+        except KeyError:
+            raise AttributeError()
+
+
+class SharedDictLikeRead:
+    _shared_state: DictProxy[str, Any]
+
+    # provide also a __contains__ implementation
+
+    def __iter__(self) -> Iterator[str]:
+        for key in self.__dict__.keys():
+            yield key
+
+    def __getitem__(
+            self,
+            key: str
+    ) -> (
+            str | dict[str, str] | list[dict[str, str]]
+    ):
+        try:
+            return getattr(self, key)
+        except AttributeError as exc:
+            raise KeyError() from exc
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self._shared_state.get(key)
+        except KeyError:
+            return default
+
+
+
+class PygeoapiSharedMetadataIdentificationConfiguration(
+    SharedDictLikeRead, SharedAttributeRead
+):
     title: dict[str, str]
     description: dict[str, str]
     keywords: dict[str, list[str]]
@@ -39,7 +76,7 @@ class PygeoapiSharedMetadataIdentificationConfiguration:
     terms_of_service: str
     url: str
 
-    _shared_metadata_identification: DictProxy[
+    _shared_state: DictProxy[
         str, str | dict[str, str] | list[str]
     ]
 
@@ -49,94 +86,26 @@ class PygeoapiSharedMetadataIdentificationConfiguration:
                 str | list[str] | dict[str, str]
             ]
     ):
-        self._shared_metadata_identification = shared_dict
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self._shared_metadata_identification.keys():
-            yield key
-
-    def __getitem__(
-            self,
-            key: str
-    ) -> (
-            str | dict[str, str] | list[dict[str, str]]
-    ):
-        return self._shared_metadata_identification[key]
-
-    def __getattr__(self, item: str) -> (
-            str | dict[str, str] | dict[str, list[str]]
-    ):
-        try:
-            return self._shared_metadata_identification[item]
-        except KeyError:
-            raise AttributeError()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self._shared_metadata_identification.get(key)
-        except KeyError:
-            return default
+        self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataLicenseConfiguration:
+class PygeoapiSharedMetadataLicenseConfiguration(SharedDictLikeRead, SharedAttributeRead):
     name: str
     url: str
 
-    _shared_metadata_license: DictProxy[str, str]
-
     def __init__(self, shared_dict: DictProxy[str, str]):
-        self._shared_metadata_license = shared_dict
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self._shared_metadata_license.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        return self._shared_metadata_license[key]
-
-    def __getattr__(self, item: str) -> str:
-        try:
-            return self._shared_metadata_license[item]
-        except KeyError:
-            raise AttributeError()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self._shared_metadata_license.get(key)
-        except KeyError:
-            return default
+        self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataProviderConfiguration:
+class PygeoapiSharedMetadataProviderConfiguration(SharedDictLikeRead, SharedAttributeRead):
     name: str
     url: str
 
-    _shared_metadata_provider: DictProxy[str, str]
-
     def __init__(self, shared_dict: DictProxy[str, str]):
-        self._shared_metadata_provider = shared_dict
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self._shared_metadata_provider.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        return self._shared_metadata_provider[key]
-
-    def __getattr__(self, item: str) -> str:
-        try:
-            return self._shared_metadata_provider[item]
-        except KeyError:
-            raise AttributeError()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self._shared_metadata_provider.get(key)
-        except KeyError:
-            return default
+        self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataContactConfiguration:
+class PygeoapiSharedMetadataContactConfiguration(SharedDictLikeRead, SharedAttributeRead):
     name: str
     position: str
     address: str
@@ -152,29 +121,10 @@ class PygeoapiSharedMetadataContactConfiguration:
     instructions: str
     role: str
 
-    _shared_metadata_contact: DictProxy[str, str]
+    _shared_state: DictProxy[str, str]
 
     def __init__(self, shared_dict: DictProxy[str, str]):
-        self._shared_metadata_contact = shared_dict
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self._shared_metadata_contact.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        return self._shared_metadata_contact[key]
-
-    def __getattr__(self, item: str) -> str:
-        try:
-            return self._shared_metadata_contact[item]
-        except KeyError:
-            raise AttributeError()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self._shared_metadata_contact.get(key)
-        except KeyError:
-            return default
+        self._shared_state = shared_dict
 
 
 class PygeoapiSharedMetadataConfiguration:
@@ -345,18 +295,15 @@ class PygeoapiSharedConfiguration:
     """
 
     metadata: PygeoapiSharedMetadataConfiguration
-    logging: PygeoapiLoggingConfiguration
     server: PygeoapiSharedServerConfiguration
     # resources: dict[str, Any]
 
     def __init__(
             self,
             metadata: PygeoapiSharedMetadataConfiguration,
-            logging: PygeoapiLoggingConfiguration,
             server: PygeoapiSharedServerConfiguration,
     ):
         self.metadata = metadata
-        self.logging = logging
         self.server = server
 
     @classmethod
