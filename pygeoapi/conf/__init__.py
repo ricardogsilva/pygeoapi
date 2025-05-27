@@ -2,25 +2,46 @@
 
 import dataclasses
 import os
+from functools import partial
 from pathlib import Path
 from typing import (
     Any,
     Iterator,
     Literal,
+    Sequence,
+    Union,
 )
 
 from pygeoapi.util import yaml_load
+from pygeoapi.conf.protocols import (
+    InternationalizationArray,
+    InternationalizationString, CollectionResourceConfiguration,
+)
+
+_default_crs = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
+_default_crs_list = partial(list, [_default_crs])
 
 
 @dataclasses.dataclass
-class PygeoapiMetadataIdentificationConfiguration:
-    """Implements the `MetadataIdentificationConfiguration` protocol"""
-    title: dict[str, str]
-    description: dict[str, str]
-    keywords: dict[str, list[str]]
-    keywords_type: str
-    terms_of_service: str
-    url: str
+class PygeoapiLinkConfiguration:
+    type: str
+    rel: str
+    href: str
+    title: str | None = None
+    hreflang: str | None = None
+    length: str | None = None
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[str, str | None]
+    ) -> 'PygeoapiLinkConfiguration':
+        return cls(**{k: v for k, v in values.items() if v is not None})
+
+
+class DictLikeRead:
+
+    # provide also a __contains__ implementation
 
     def __iter__(self) -> Iterator[str]:
         for key in self.__dict__.keys():
@@ -36,6 +57,23 @@ class PygeoapiMetadataIdentificationConfiguration:
             return getattr(self, key)
         except AttributeError as exc:
             raise KeyError() from exc
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
+
+
+@dataclasses.dataclass
+class PygeoapiMetadataIdentificationConfiguration(DictLikeRead):
+    """Implements the `MetadataIdentificationConfiguration` protocol"""
+    title: dict[str, str]
+    description: dict[str, str]
+    keywords: dict[str, list[str]]
+    keywords_type: str
+    terms_of_service: str
+    url: str
 
     @classmethod
     def from_dict(
@@ -65,27 +103,11 @@ class PygeoapiMetadataIdentificationConfiguration:
             url=values.get('url', ''),
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
 
 @dataclasses.dataclass
-class PygeoapiMetadataLicenseConfiguration:
+class PygeoapiMetadataLicenseConfiguration(DictLikeRead):
     name: str
     url: str
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
 
     @classmethod
     def from_dict(
@@ -95,27 +117,11 @@ class PygeoapiMetadataLicenseConfiguration:
             url=values.get('url'),
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
 
 @dataclasses.dataclass
-class PygeoapiMetadataProviderConfiguration:
+class PygeoapiMetadataProviderConfiguration(DictLikeRead):
     name: str
     url: str
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
 
     @classmethod
     def from_dict(
@@ -125,15 +131,9 @@ class PygeoapiMetadataProviderConfiguration:
             url=values.get('url'),
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
 
 @dataclasses.dataclass
-class PygeoapiMetadataContactConfiguration:
+class PygeoapiMetadataContactConfiguration(DictLikeRead):
     name: str
     position: str
     address: str
@@ -148,10 +148,6 @@ class PygeoapiMetadataContactConfiguration:
     hours_of_service: str
     instructions: str
     role: str
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
 
     def __getitem__(self, key: str) -> str:
         compat_name = self._get_compat_key_name(key)
@@ -197,27 +193,12 @@ class PygeoapiMetadataContactConfiguration:
 
 
 @dataclasses.dataclass
-class PygeoapiMetadataConfiguration:
+class PygeoapiMetadataConfiguration(DictLikeRead):
     """Implements the `MetadataConfiguration` protocol"""
     identification: PygeoapiMetadataIdentificationConfiguration
     license: PygeoapiMetadataLicenseConfiguration
     provider: PygeoapiMetadataProviderConfiguration
     contact: PygeoapiMetadataContactConfiguration
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> (
-            PygeoapiMetadataIdentificationConfiguration |
-            PygeoapiMetadataLicenseConfiguration |
-            PygeoapiMetadataProviderConfiguration |
-            PygeoapiMetadataContactConfiguration
-    ):
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
 
     @classmethod
     def from_dict(
@@ -238,86 +219,13 @@ class PygeoapiMetadataConfiguration:
                 values['contact']),
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
 
 @dataclasses.dataclass
-class PygeoapiLoggingConfiguration:
-    level: str
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
-
-    @classmethod
-    def from_dict(cls, values: dict[str, str]) -> 'PygeoapiLoggingConfiguration':
-        return cls(
-            level=values.get('level', 'warning').upper(),
-        )
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
-
-@dataclasses.dataclass
-class PygeoapiServerBindConfiguration:
-    host: str
-    port: int
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str | int:
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
-
-    @classmethod
-    def from_dict(
-            cls, values: dict[str, str | int]) -> 'PygeoapiServerBindConfiguration':
-        return cls(
-            host=values['host'],
-            port=int(values['port']),
-        )
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
-
-@dataclasses.dataclass
-class PygeoapiProcessManagerConfiguration:
+class PygeoapiProcessManagerConfiguration(DictLikeRead):
     name: str
     connection: str | None = None
     output_dir: str | None = None
     processes: dict[str, dict[str, Any]] = dataclasses.field(default_factory=dict)
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str | None:
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
 
     def __setitem__(
             self,
@@ -349,27 +257,11 @@ class PygeoapiProcessManagerConfiguration:
             output_dir=values.get('output_dir'),
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
 
 @dataclasses.dataclass
-class PygeoapiMapConfiguration:
+class PygeoapiMapConfiguration(DictLikeRead):
     url: str
     attribution: str
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> str:
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
 
     @classmethod
     def from_dict(
@@ -379,23 +271,14 @@ class PygeoapiMapConfiguration:
             attribution=values['attribution'],
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
-
 
 @dataclasses.dataclass
-class PygeoapiServerConfiguration:
+class PygeoapiServerConfiguration(DictLikeRead):
     enable_admin: bool
-    bind: PygeoapiServerBindConfiguration
     public_url: str
     mimetype: str
     encoding: str
-    gzip_responses: bool
     languages: list[str]
-    enable_cors: bool
     pretty_print_responses: bool
     limit: int
     templates_path: str
@@ -404,16 +287,11 @@ class PygeoapiServerConfiguration:
     process_manager: PygeoapiProcessManagerConfiguration | None
     ogc_schemas_location: str | None
 
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
     def __getitem__(self, key: str) -> (
             bool | int | str |
             dict[str, str] | list[str],
             None |
-            PygeoapiProcessManagerConfiguration |
-            PygeoapiServerBindConfiguration,
+            PygeoapiProcessManagerConfiguration
     ):
         if key == 'templates':
             return {
@@ -444,8 +322,6 @@ class PygeoapiServerConfiguration:
     def _get_compat_key_name(cls, key: str) -> str:
         return {
             'admin': 'enable_admin',
-            'cors': 'enable_cors',
-            'gzip': 'gzip_responses',
             'manager': 'process_manager',
             'pretty_print': 'pretty_print_responses',
             'url': 'public_url',
@@ -468,15 +344,12 @@ class PygeoapiServerConfiguration:
                 raw_process_manager_conf)
         return cls(
             enable_admin=values['admin'],
-            bind=PygeoapiServerBindConfiguration.from_dict(values['bind']),
             public_url=values['url'],
             mimetype=values.get('mimetype', 'application/json; charset=UTF-8'),
             encoding=values.get('encoding', 'utf-8'),
-            gzip_responses=values.get('gzip', False),
             languages=values.get(
                 'languages', ['en']
             ),
-            enable_cors=values.get('cors', False),
             pretty_print_responses=values.get('pretty_print', False),
             limit=values.get('limit', 10),
             templates_path=values.get(
@@ -488,34 +361,452 @@ class PygeoapiServerConfiguration:
             ogc_schemas_location=values.get('ogc_schemas_location'),
         )
 
-    def get(self, key: str, default: Any = None) -> Any:
+
+@dataclasses.dataclass
+class PygeoapiCollectionResourceSpatialExtentConfiguration(DictLikeRead):
+    bbox: tuple[float, float, float, float] | tuple[float, float, float, float, float, float]
+    crs: str = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[
+                str,
+                str |
+                tuple[float, float, float, float] |
+                tuple[float, float, float, float, float, float]
+            ]
+    ) -> 'PygeoapiCollectionResourceSpatialExtentConfiguration':
+        return cls(**{k: v for k, v in values.items() if v is not None})
+
+
+@dataclasses.dataclass
+class PygeoapiCollectionResourceTemporalExtentConfiguration(DictLikeRead):
+    begin: str | None = None
+    end: str | None = None
+    trs: str = 'http://www.opengis.net/def/uom/ISO-8601/0/Gregorian'
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[str, str | None]
+    ) -> 'PygeoapiCollectionResourceTemporalExtentConfiguration':
+        return cls(**{k: v for k, v in values.items() if v is not None})
+
+
+@dataclasses.dataclass
+class PygeoapiCollectionResourceExtentsConfiguration(DictLikeRead):
+    spatial: PygeoapiCollectionResourceSpatialExtentConfiguration
+    temporal: PygeoapiCollectionResourceTemporalExtentConfiguration | None = None
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[str, dict[str, str | list[float]]]
+    ) -> 'PygeoapiCollectionResourceExtentsConfiguration':
+        return cls(
+            spatial=PygeoapiCollectionResourceSpatialExtentConfiguration.from_dict(
+                values['spatial']),
+            temporal=(
+                PygeoapiCollectionResourceTemporalExtentConfiguration.from_dict(
+                    raw_temporal_conf
+                ) if (raw_temporal_conf := values.get('temporal')) is not None
+                else None
+            ),
+        )
+
+
+@dataclasses.dataclass
+class PygeoapiCollectionProviderGeometryConfiguration(DictLikeRead):
+    x_field: str
+    y_field: str
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[str, str]
+    ) -> 'PygeoapiCollectionProviderGeometryConfiguration':
+        return cls(
+            x_field=values['x_field'],
+            y_field=values['y_field'],
+        )
+
+
+@dataclasses.dataclass
+class PygeoapiCollectionProviderMediaTypeConfiguration(DictLikeRead):
+    name: str
+    media_type: str
+
+    @classmethod
+    def _get_compat_key_name(cls, key: str) -> str:
+        return {
+            'mimetype': 'media_type',
+        }.get(key, key)
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[str, str]
+    ) -> 'PygeoapiCollectionProviderMediaTypeConfiguration':
+        return cls(
+            name=values['name'],
+            media_type=values['mimetype'],
+        )
+
+    def __getitem__(self, key: str) -> str:
+        compat_name = self._get_compat_key_name(key)
         try:
-            return self.__getitem__(key)
+            return getattr(self, compat_name)
+        except AttributeError as exc:
+            raise KeyError() from exc
+
+
+@dataclasses.dataclass
+class PygeoapiCollectionProviderConfiguration(DictLikeRead):
+    type: Literal[
+        'coverage',
+        'edr',
+        'feature',
+        'map',
+        'record',
+        'stac',
+        'tile',
+    ]
+    name: str
+    data: str | dict[str, Any]
+    is_default: bool = False
+    is_editable: bool = False
+    table: str | None = None
+    id_field: str | None = None
+    geometry: PygeoapiCollectionProviderGeometryConfiguration | None = None
+    time_field: str | None = None
+    title_field: str | None = None
+    default_format: PygeoapiCollectionProviderMediaTypeConfiguration | None = None
+    options: dict[str, Any] | None = None
+    public_properties: list[str] | None = None
+    supported_crs: list[str] = dataclasses.field(default_factory=_default_crs_list)
+    storage_crs: str = _default_crs
+    storage_crs_coordinate_epoch: str | None = None
+
+    @classmethod
+    def _get_compat_key_name(cls, key: str) -> str:
+        return {
+            'default': 'is_default',
+            'editable': 'is_editable',
+            'format': 'default_format',
+            'properties': 'public_properties',
+            'crs': 'supported_crs',
+        }.get(key, key)
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[
+                str,
+                str | bool | dict[str, Any]
+            ]
+    ) -> 'PygeoapiCollectionProviderConfiguration':
+        return cls(
+            type=values['type'],
+            name=values['name'],
+            data=(
+                dict(raw_data)
+                if isinstance(raw_data := values['data'], dict) else raw_data
+            ),
+            is_default=values.get('default', False),
+            is_editable=values.get('editable', False),
+            table=values.get('table', None),
+            id_field=values.get('id_field', None),
+            geometry=(
+                PygeoapiCollectionProviderGeometryConfiguration.from_dict(
+                    raw_geom
+                ) if (raw_geom := values.get('geometry')) is not None
+                else None
+            ),
+            time_field=values.get('time_field', None),
+            title_field=values.get('title_field', None),
+            default_format=(
+                PygeoapiCollectionProviderMediaTypeConfiguration.from_dict(
+                    raw_default_format
+                ) if (raw_default_format := values.get('format')) is not None
+                else None
+            ),
+            options=(
+                dict(raw_options)
+                if isinstance(raw_options := values.get('options'), dict)
+                else None
+            ),
+            public_properties=(
+                raw_properties[:]
+                if (raw_properties := values.get('properties')) is not None
+                else None
+            ),
+            supported_crs=(
+                raw_crs[:]
+                if (raw_crs := values.get('crs')) is not None
+                else _default_crs_list()
+            ),
+            storage_crs=values.get('storage_crs', _default_crs),
+            storage_crs_coordinate_epoch=values.get('storage_crs_coordinate_epoch'),
+        )
+
+    def __getitem__(self, key: str) -> str:
+        compat_name = self._get_compat_key_name(key)
+        try:
+            return getattr(self, compat_name)
+        except AttributeError as exc:
+            raise KeyError() from exc
+
+
+@dataclasses.dataclass
+class PygeoapiLimitsConfiguration(DictLikeRead):
+    max_items: int = 10
+    default_items: int = 10
+    max_distance_x: float | None = None
+    max_distance_y: float | None = None
+    max_distance_units: str | None = None
+    on_exceed: Literal['error', 'throttle'] = 'throttle'
+
+    @classmethod
+    def from_dict(
+            cls,
+            values: dict[str, int | float | str | None]
+    ) -> 'PygeoapiLimitsConfiguration':
+        return cls(**{k: v for k, v in values.items() if v is not None})
+
+
+@dataclasses.dataclass
+class PygeoapiCollectionResourceConfiguration(DictLikeRead):
+    identifier: str
+    type: Literal[
+        'collection',
+        'stac-collection',
+    ]
+    title: InternationalizationString
+    description: InternationalizationString
+    keywords: InternationalizationArray
+    extents: PygeoapiCollectionResourceExtentsConfiguration
+    providers: list[PygeoapiCollectionProviderConfiguration]
+    visibility: Literal['default', 'hidden'] = 'default'
+    linked_data: dict[str, str | dict] | None = None
+    links: list[PygeoapiLinkConfiguration] | None = None
+    limits: PygeoapiLimitsConfiguration | None = None
+
+    @classmethod
+    def from_dict(
+            cls,
+            identifier: str,
+            values: dict[str, str | dict[str, Any] | None]
+    ) -> 'PygeoapiCollectionResourceConfiguration':
+        if isinstance(raw_keywords := values['keywords'], dict):
+            parsed_keywords = {
+                lang_code: items[:]
+                for lang_code, items in raw_keywords.items()
+            }
+        else:
+            parsed_keywords = raw_keywords[:]
+
+        return cls(
+            identifier=identifier,
+            type=values['type'],
+            title=(
+                dict(raw_title)
+                if isinstance(raw_title := values['title'], dict)
+                else raw_title
+            ),
+            description=(
+                dict(raw_description)
+                if isinstance(raw_description := values['description'], dict)
+                else raw_description
+            ),
+            keywords=parsed_keywords,
+            extents=PygeoapiCollectionResourceExtentsConfiguration.from_dict(
+                values['extents']),
+            providers=[
+                PygeoapiCollectionProviderConfiguration.from_dict(raw_provider_conf)
+                for raw_provider_conf in values['providers']
+            ],
+            visibility=values.get('visibility', 'default'),
+            linked_data=(
+                dict(raw_linked_data)
+                if (raw_linked_data := values.get('linked_data')) is not None
+                else None
+            ),
+            links=(
+                [
+                    PygeoapiLinkConfiguration.from_dict(raw_link)
+                    for raw_link in raw_links
+                ] if (raw_links := values.get('links')) is not None
+                else None
+            ),
+            limits=(
+                PygeoapiLimitsConfiguration.from_dict(raw_limits)
+                if (raw_limits := values.get('limits')) is not None
+                else None
+            ),
+        )
+
+
+@dataclasses.dataclass
+class PygeoapiProcessorConfiguration(DictLikeRead):
+    name: str
+
+    @classmethod
+    def from_dict(cls, values: dict[str, str]) -> 'PygeoapiProcessorConfiguration':
+        return cls(name=values['name'])
+
+
+@dataclasses.dataclass
+class PygeoapiProcessResourceConfiguration(DictLikeRead):
+    identifier: str
+    type: Literal['process']
+    processor: PygeoapiProcessorConfiguration
+
+    @classmethod
+    def from_dict(
+            cls, identifier: str, values: dict[str, str | dict[str, str]]
+    ) -> 'PygeoapiProcessResourceConfiguration':
+        return cls(
+            identifier=identifier,
+            type=values['type'],
+            processor=PygeoapiProcessorConfiguration.from_dict(values['processor'])
+        )
+
+
+class PygeoapiResourcesConfiguration(DictLikeRead):
+    _resources: dict
+
+    def __init__(
+            self,
+            resources: Sequence[
+                Union[
+                    PygeoapiCollectionResourceConfiguration,
+                    PygeoapiProcessResourceConfiguration
+                ]
+            ]
+    ) -> None:
+        self._resources = {
+            resource.identifier: resource for resource in resources
+        }
+
+    def __iter__(self) -> Iterator[str]:
+        for key in self._resources.keys():
+            yield key
+
+    def __getitem__(
+            self,
+            key: str
+    ) -> Union[PygeoapiCollectionResourceConfiguration, PygeoapiProcessorConfiguration]:
+        return self._resources[key]
+
+    def get(self, resource_identifier: str, default: Any = None) -> Any:
+        try:
+            return self.__getitem__(resource_identifier)
         except KeyError:
             return default
 
 
+# class PygeoapiResourceManager:
+#     _resources: dict
+#
+#     def __init__(
+#             self,
+#             resources: Sequence[
+#                 Union[
+#                     PygeoapiCollectionResourceConfiguration,
+#                     PygeoapiProcessResourceConfiguration
+#                 ]
+#             ]
+#     ) -> None:
+#         self._resources = {
+#             resource.identifier: resource for resource in resources
+#         }
+#
+#     def __iter__(self) -> Iterator[str]:
+#         for key in self._resources.keys():
+#             yield key
+#
+#     def __getitem__(
+#             self,
+#             key: str
+#     ) -> Union[PygeoapiCollectionResourceConfiguration, PygeoapiProcessorConfiguration]:
+#         return self._resources[key]
+#
+#     def get(self, resource_identifier: str, default: Any = None) -> Any:
+#         try:
+#             return self.__getitem__(resource_identifier)
+#         except KeyError:
+#             return default
+#
+#     def get_resource(self, resource_identifier: str) -> Union[
+#             PygeoapiCollectionResourceConfiguration,
+#             PygeoapiProcessResourceConfiguration
+#     ]:
+#         return self._resources[resource_identifier]
+#
+#     def list_resources(self, limit: int | None = None, offset: int = 0) -> list[
+#         PygeoapiCollectionResourceConfiguration |
+#         PygeoapiProcessResourceConfiguration
+#     ]:
+#         list_range = slice(
+#             offset,
+#             (offset + limit) if limit is not None else -1,
+#         )
+#         return list(self._resources.values())[list_range]
+#
+#     def create_resource(
+#             self,
+#             resource: Union[
+#                 PygeoapiCollectionResourceConfiguration,
+#                 PygeoapiProcessResourceConfiguration
+#             ]
+#     ) -> Union[
+#         PygeoapiCollectionResourceConfiguration,
+#         PygeoapiProcessResourceConfiguration
+#     ]:
+#         if resource.identifier in self._resources:
+#             raise RuntimeError(
+#                 f'Resource identified by {resource.identifier} already exists')
+#         else:
+#             self._resources[resource.identifier] = resource
+#         return resource
+#
+#     def update_resource(
+#             self,
+#             resource: Union[
+#                 PygeoapiCollectionResourceConfiguration,
+#                 PygeoapiProcessResourceConfiguration
+#             ]
+#     ) -> Union[
+#         PygeoapiCollectionResourceConfiguration,
+#         PygeoapiProcessResourceConfiguration
+#     ]:
+#         if resource.identifier not in self._resources:
+#             raise RuntimeError('Cannot update a resource that does not exist')
+#         else:
+#             self._resources[resource.identifier] = resource
+#         return resource
+#
+#     def delete_resource(self, resource_identifier: str) -> bool:
+#         try:
+#             self._resources.pop(resource_identifier)
+#             return True
+#         except KeyError:
+#             raise RuntimeError(
+#                 f'Resource identified by {resource_identifier} does not exist')
+
+
 @dataclasses.dataclass
-class PygeoapiConfiguration:
+class PygeoapiConfiguration(DictLikeRead):
     """Default implementation of ConfigurationManager."""
 
     metadata: PygeoapiMetadataConfiguration
-    logging: PygeoapiLoggingConfiguration
     server: PygeoapiServerConfiguration
-    resources: dict[str, Any]
-
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
-
-    def __getitem__(self, key: str) -> (
-            PygeoapiMetadataConfiguration | PygeoapiLoggingConfiguration |
-            PygeoapiServerConfiguration | dict[str, Any]
-    ):
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
+    resources: PygeoapiResourcesConfiguration
+    # resources: dict[
+    #     str,
+    #     CollectionResourceConfiguration | ProcessResourceConfiguration
+    # ]
 
     @classmethod
     def from_configuration_file(
@@ -524,11 +815,27 @@ class PygeoapiConfiguration:
         if (conf_path := Path(configuration_file_path)).exists():
             with conf_path.open('r', encoding='utf-8') as fh:
                 raw_conf = yaml_load(fh)
+            parsed_resources = []
+            for resource_id, resource_conf in raw_conf.get('resources', {}).items():
+                match resource_conf.get('type'):
+                    case 'collection' | 'stac-collection':
+                        parsed_resources.append(
+                            PygeoapiCollectionResourceConfiguration.from_dict(
+                                resource_id, resource_conf)
+                        )
+                    case 'process':
+                        parsed_resources.append(
+                            PygeoapiProcessResourceConfiguration.from_dict(
+                                resource_id, resource_conf)
+                        )
+                    case _:
+                        raise RuntimeError(f'Unrecognized resource type: {_}')
             return cls(
                 metadata=PygeoapiMetadataConfiguration.from_dict(raw_conf['metadata']),
-                logging=PygeoapiLoggingConfiguration.from_dict(raw_conf['logging']),
                 server=PygeoapiServerConfiguration.from_dict(raw_conf['server']),
-                resources=dict(raw_conf['resources']),
+                resources=PygeoapiResourcesConfiguration(parsed_resources)
+                # resources={
+                #     resource.identifier: resource for resource in parsed_resources},
             )
         else:
             raise RuntimeError(f'Configuration file {configuration_file_path} does not exist')
@@ -539,12 +846,6 @@ class PygeoapiConfiguration:
             return cls.from_configuration_file(config_path)
         else:
             raise RuntimeError('PYGEOAPI_CONFIG environment variable not set')
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
 
     def as_dict(self) -> dict[str, dict[str, Any]]:
         return dataclasses.asdict(self)

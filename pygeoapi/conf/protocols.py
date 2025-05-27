@@ -90,7 +90,7 @@ class MetadataConfiguration(DictLikeRead, Protocol):
 
 
 class ProcessManagerConfiguration(DictLikeRead, DictLikeWrite, Protocol):
-    name: str
+    identifier: str
     connection: str
     output_dir: str
     processes: dict[str, dict[str, Any]]
@@ -121,25 +121,51 @@ class ProcessorConfiguration(Protocol):
 
 
 class ProcessResourceConfiguration(Protocol):
+    name: str
     type: Literal['process']
     processor: ProcessorConfiguration
 
 
-class CollectionProviderFeatureConfiguration(Protocol):
-    type: Literal['feature']
+class CollectionProviderGeometryConfiguration(DictLikeRead, Protocol):
+    x_field: str
+    y_field: str
 
 
-class CollectionProviderCoverageConfiguration(Protocol):
-    type: Literal['coverage']
+class CollectionProviderMediaTypeConfiguration(DictLikeRead, Protocol):
+    name: str
+    media_type: str
 
 
-class CollectionProviderTileConfiguration(Protocol):
-    type: Literal['tile']
+class CollectionProviderConfiguration(DictLikeRead, Protocol):
+    type: Literal[
+        'coverage',
+        'edr',
+        'feature',
+        'map',
+        'record',
+        'stac',
+        'tile',
+    ]
+    name: str
+    data: str | dict[str, Any]
+    default: bool
+    editable: bool
+    table: str | None
+    id_field: str | None
+    geometry: CollectionProviderGeometryConfiguration | None
+    time_field: str | None
+    title_field: str | None
+    default_format: CollectionProviderMediaTypeConfiguration | None
+    options: dict[str, Any] | None
+    public_properties: list[str] | None
+    supported_crs: list[str]
+    storage_crs: str
+    storage_crs_coordinate_epoch: str | None
 
 
 class CollectionResourceSpatialExtentConfiguration(Protocol):
     bbox: tuple[float, float, float, float] | tuple[float, float, float, float, float, float]
-    crs: str | None
+    crs: str
 
 
 class CollectionResourceTemporalExtentConfiguration(Protocol):
@@ -148,9 +174,9 @@ class CollectionResourceTemporalExtentConfiguration(Protocol):
     trs: str | None
 
 
-class CollectionResourceExtentConfiguration(Protocol):
+class CollectionResourceExtentsConfiguration(Protocol):
     spatial: CollectionResourceSpatialExtentConfiguration
-    temporal: CollectionResourceTemporalExtentConfiguration
+    temporal: CollectionResourceTemporalExtentConfiguration | None
 
 
 class LimitsConfiguration(Protocol):
@@ -158,29 +184,63 @@ class LimitsConfiguration(Protocol):
     default_items: int
     max_distance_x: float
     max_distance_y: float
-    max_distance_units: float
+    max_distance_units: str
     on_exceed: Literal['error', 'throttle']
 
 
-class CollectionResourceConfiguration(Protocol):
-    type: Literal['collection']
+class CollectionResourceConfiguration(DictLikeRead, Protocol):
+    identifier: str
+    type: Literal[
+        'collection',
+        'stac-collection',
+    ]
+    visibility: Literal['default', 'hidden'] | None
     title: InternationalizationString
     description: InternationalizationString
     keywords: InternationalizationArray
-    extents: CollectionResourceExtentConfiguration
-    providers: list[
-        CollectionProviderFeatureConfiguration |
-        CollectionProviderCoverageConfiguration |
-        CollectionProviderTileConfiguration
-    ]
-    visibility: Literal['default', 'hidden'] | None = 'default'
-    linked_data: dict[str, Any] | None
+    linked_data: dict[str, str | dict] | None
     links: list[LinkConfiguration] | None
+    extents: CollectionResourceExtentsConfiguration
     limits: LimitsConfiguration | None
+    providers: list[CollectionProviderConfiguration]
 
 
-class StacCollectionResourceConfiguration(Protocol):
-    type: Literal['stac-collection']
+class ResourcesConfiguration(DictLikeRead, Protocol):
+    ...
+
+
+
+# class ResourceManager(DictLikeRead, DictLikeWrite, Protocol):
+#
+#     def get_resource(
+#             self,
+#             resource_identifier: str
+#     ) -> CollectionResourceConfiguration | ProcessResourceConfiguration:
+#         ...
+#
+#     def list_resources(
+#             self,
+#             limit: int | None = None,
+#             offset: int = 0
+#     ) -> list[
+#         CollectionResourceConfiguration | ProcessResourceConfiguration
+#     ]:
+#         ...
+#
+#     def create_resource(
+#             self,
+#             resource: CollectionResourceConfiguration | ProcessResourceConfiguration
+#     ) -> CollectionResourceConfiguration | ProcessResourceConfiguration:
+#         ...
+#
+#     def update_resource(
+#             self,
+#             resource: CollectionResourceConfiguration | ProcessResourceConfiguration
+#     ) -> CollectionResourceConfiguration | ProcessResourceConfiguration:
+#         ...
+#
+#     def delete_resource(self, resource_identifier: str) -> bool:
+#         ...
 
 
 class ConfigurationManager(DictLikeRead, Protocol):
@@ -205,12 +265,8 @@ class ConfigurationManager(DictLikeRead, Protocol):
 
     metadata: MetadataConfiguration
     server: ServerConfiguration
-    resources: dict[
-        str,
-        CollectionResourceConfiguration |
-        StacCollectionResourceConfiguration |
-        ProcessResourceConfiguration
-    ]
+    resources: ResourcesConfiguration
+    # resources: dict[str, CollectionResourceConfiguration | ProcessResourceConfiguration]
 
     def as_dict(self) -> dict[str, dict[str, Any]]:
         """Return a dict representation of the configuration."""
