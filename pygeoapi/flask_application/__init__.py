@@ -16,12 +16,6 @@ from pygeoapi.util import (
 )
 
 
-class ConfigInitializer(Protocol):
-
-    def __call__(self) -> ConfigurationManager:
-        """Return an object which implements the pygeoapi configuration interface."""
-
-
 def get_app(flask_test_config: dict | None = None):
     config_initializer: ConfigInitializer = PygeoapiConfiguration.from_env_variable
     if (config_initializer_path := os.getenv('PYGEOAPI_CONFIG_INITIALIZER')) is not None:

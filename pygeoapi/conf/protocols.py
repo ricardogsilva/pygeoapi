@@ -24,6 +24,17 @@ class DictLikeRead(Protocol):
     def get(self, key: str, default: Any = None) -> Any:
         """Retrieve a configuration value or the default value."""
 
+    def items(self) -> Iterator[tuple[str, Any]]:
+        """Retrieve matching combinations of key-value pairs"""
+        ...
+
+    def keys(self) -> Iterator[str]:
+        ...
+
+    def values(self) -> Iterator[Any]:
+        ...
+
+
 
 class DictLikeWrite(Protocol):
 
@@ -43,7 +54,7 @@ class LinkConfiguration(DictLikeRead, Protocol):
     href: str
     title: str | None
     hreflang: str | None
-    length: str | None
+    length: int
 
 
 class MetadataIdentificationConfiguration(DictLikeRead, Protocol):
@@ -70,8 +81,8 @@ class MetadataContactConfiguration(DictLikeRead, Protocol):
     position: str | None
     address: str | None
     city: str | None
-    state_or_province: str | None
-    postal_code: str | None
+    stateorprovince: str | None
+    postalcode: str | None
     country: str | None
     phone: str | None
     fax: str | None
@@ -89,11 +100,15 @@ class MetadataConfiguration(DictLikeRead, Protocol):
     contact: MetadataContactConfiguration
 
 
-class ProcessManagerConfiguration(DictLikeRead, DictLikeWrite, Protocol):
+class ProcessesConfiguration(DictLikeRead, Protocol):
+    """Contains a set of process resources and has a dict-like interface"""
+
+
+class ProcessManagerConfiguration(DictLikeRead, Protocol):
     identifier: str
     connection: str
     output_dir: str
-    processes: dict[str, dict[str, Any]]
+    processes: ProcessesConfiguration
 
 
 class MapConfiguration(DictLikeRead, Protocol):
@@ -102,17 +117,17 @@ class MapConfiguration(DictLikeRead, Protocol):
 
 
 class ServerConfiguration(DictLikeRead, Protocol):
-    enable_admin: bool
-    public_url: str
+    admin: bool
+    url: str
     mimetype: str
     encoding: str
     languages: list[str]
-    pretty_print_responses: bool
+    pretty_print: bool
     limit: int
     templates_path: str
     static_path: str
     map: MapConfiguration
-    process_manager: ProcessManagerConfiguration | None
+    manager: ProcessManagerConfiguration | None
     ogc_schemas_location: str | None
 
 
@@ -133,7 +148,7 @@ class CollectionProviderGeometryConfiguration(DictLikeRead, Protocol):
 
 class CollectionProviderMediaTypeConfiguration(DictLikeRead, Protocol):
     name: str
-    media_type: str
+    mimetype: str
 
 
 class CollectionProviderConfiguration(DictLikeRead, Protocol):
@@ -155,10 +170,10 @@ class CollectionProviderConfiguration(DictLikeRead, Protocol):
     geometry: CollectionProviderGeometryConfiguration | None
     time_field: str | None
     title_field: str | None
-    default_format: CollectionProviderMediaTypeConfiguration | None
+    format: CollectionProviderMediaTypeConfiguration | None
     options: dict[str, Any] | None
-    public_properties: list[str] | None
-    supported_crs: list[str]
+    properties: list[str] | None
+    crs: list[str]
     storage_crs: str
     storage_crs_coordinate_epoch: str | None
 
@@ -206,41 +221,7 @@ class CollectionResourceConfiguration(DictLikeRead, Protocol):
 
 
 class ResourcesConfiguration(DictLikeRead, Protocol):
-    ...
-
-
-
-# class ResourceManager(DictLikeRead, DictLikeWrite, Protocol):
-#
-#     def get_resource(
-#             self,
-#             resource_identifier: str
-#     ) -> CollectionResourceConfiguration | ProcessResourceConfiguration:
-#         ...
-#
-#     def list_resources(
-#             self,
-#             limit: int | None = None,
-#             offset: int = 0
-#     ) -> list[
-#         CollectionResourceConfiguration | ProcessResourceConfiguration
-#     ]:
-#         ...
-#
-#     def create_resource(
-#             self,
-#             resource: CollectionResourceConfiguration | ProcessResourceConfiguration
-#     ) -> CollectionResourceConfiguration | ProcessResourceConfiguration:
-#         ...
-#
-#     def update_resource(
-#             self,
-#             resource: CollectionResourceConfiguration | ProcessResourceConfiguration
-#     ) -> CollectionResourceConfiguration | ProcessResourceConfiguration:
-#         ...
-#
-#     def delete_resource(self, resource_identifier: str) -> bool:
-#         ...
+    """Contains a set of resources and has a dict-like interface"""
 
 
 class ConfigurationManager(DictLikeRead, Protocol):
@@ -266,8 +247,13 @@ class ConfigurationManager(DictLikeRead, Protocol):
     metadata: MetadataConfiguration
     server: ServerConfiguration
     resources: ResourcesConfiguration
-    # resources: dict[str, CollectionResourceConfiguration | ProcessResourceConfiguration]
 
     def as_dict(self) -> dict[str, dict[str, Any]]:
         """Return a dict representation of the configuration."""
         ...
+
+
+class ConfigurationInitializer(Protocol):
+
+    def __call__(self) -> ConfigurationManager:
+        """Return an object which implements the pygeoapi configuration interface."""

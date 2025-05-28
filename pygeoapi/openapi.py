@@ -45,6 +45,7 @@ import yaml
 
 from pygeoapi import l10n
 from pygeoapi.api import all_apis
+from pygeoapi.conf.protocols import ConfigurationManager
 from pygeoapi.models.openapi import OAPIFormat
 from pygeoapi.util import (filter_dict_by_key_value, to_json, yaml_load,
                            get_api_rules, get_base_url)
@@ -223,7 +224,10 @@ def gen_contact(cfg: dict) -> dict:
     return contact
 
 
-def get_oas_30(cfg: dict, fail_on_invalid_collection: bool = True) -> dict:
+def get_oas_30(
+        cfg: ConfigurationManager,
+        fail_on_invalid_collection: bool = True
+) -> dict:
     """
     Generates an OpenAPI 3.0 Document
 
@@ -552,7 +556,8 @@ def get_oas_30(cfg: dict, fail_on_invalid_collection: bool = True) -> dict:
         schema_dict = get_config_schema()
         oas['definitions'] = schema_dict['definitions']
         LOGGER.debug('Adding admin endpoints')
-        oas['paths'].update(get_admin(cfg))
+        oas['paths'].update(get_admin(cfg.as_dict()))
+        # oas['paths'].update(get_admin(dict(cfg)))
 
     return oas
 

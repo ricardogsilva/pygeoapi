@@ -976,10 +976,33 @@ def modify_pygeofilter(
 
 
 def import_object(object_path: str) -> object:
-    """Import an object from the given Python path."""
-    module_path, object_name = object_path.rpartition('.')[::2]
-    imported_module = importlib.import_module(module_path)
-    return getattr(imported_module, object_name)
+    """Import an object from the given Python path.
+
+    Python path can be either a path to a module-level object (e.g. a function,
+    a class, etc) or a property of a module-level object (e.g. a class method).
+    In this second case, the property name must be spearated by a colon
+    (i.e. ':').
+
+    Examples:
+
+    >>> # importing a module-level object
+    >>> import_object('pygeoapi.process.base.get_manager')
+    >>> # importing an object property
+    >>> import_object('pygeoapi.conf.shared.PygeoapiSharedConfiguration:from_env_variable')
+
+    """
+    try:
+        path, property_name = object_path.split(':')
+    except ValueError:
+        module_path, object_name = object_path.rpartition('.')[::2]
+        imported_module = importlib.import_module(module_path)
+        result = getattr(imported_module, object_name)
+    else:
+        module_path, object_name = path.rpartition('.')[::2]
+        imported_module = importlib.import_module(module_path)
+        imported_object = getattr(imported_module, object_name)
+        result = getattr(imported_object, property_name)
+    return result
 
 
 def _inplace_transform_filter_geometries(

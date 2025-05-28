@@ -46,7 +46,7 @@ import uvicorn
 
 from pygeoapi import flask_application
 from pygeoapi.api import API
-from pygeoapi.conf import PygeoapiConfiguration
+from pygeoapi.conf import initialize_configuration
 from pygeoapi.openapi import get_oas
 from pygeoapi.config import (
     config,
@@ -112,21 +112,20 @@ def plugins():
 @click.pass_context
 def serve(ctx, server):
     """Run the server with different daemon type (--flask is the default)"""
-    if (config_path:=os.getenv('PYGEOAPI_CONFIG')) is not None:
-        pygeoapi_config = PygeoapiConfiguration.from_configuration_file(config_path)
-        print("Initialized pygeoapi config")
-        openapi_document = get_oas(pygeoapi_config)
-        print("Generated OpenAPI document")
-        pygeoapi_api = API(pygeoapi_config, openapi_document)
-        print("Initialized pygeoapi API")
-        if server == 'flask':
-            app = flask_application.get_app_from_pygeoapi_api(pygeoapi_api)
-            app.run(
-                debug=True,
-                host=app.extensions['pygeoapi']['api'].config['server']['bind']['host'],
-                port=app.extensions['pygeoapi']['api'].config['server']['bind']['port']
-            )
-        elif server == "starlette":
+    pygeoapi_config = initialize_configuration(
+        os.getenv('PYGEOAPI_CONFIG_INITIALIZER'))
+    print("Initialized pygeoapi config")
+    openapi_document = get_oas(pygeoapi_config)
+    print("Generated OpenAPI document")
+    pygeoapi_api = API(pygeoapi_config, openapi_document)
+    print("Initialized pygeoapi API")
+    if server == 'flask':
+        bind_host = os.getenv('PYGEOAPI_FLASK_BIND_HOST', 'localhost')
+        bind_port = os.getenv('PYGEOAPI_FLASK_BIND_PORT', '5000')
+        app = flask_application.get_app_from_pygeoapi_api(pygeoapi_api)
+        app.run(debug=True, host=bind_host, port=int(bind_port))
+    elif (config_path:=os.getenv('PYGEOAPI_CONFIG')) is not None:
+        if server == "starlette":
             from pygeoapi.starlette_app import serve as serve_starlette
             ctx.invoke(serve_starlette)
         elif server == "starlette_application":

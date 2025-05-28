@@ -560,7 +560,7 @@ class API:
 
         self.pretty_print = self.config['server']['pretty_print']
 
-        setup_logger(self.config['logging'])
+        # setup_logger(self.config['logging'])
 
         # Create config clone for HTML templating with modified base URL
         self.tpl_config = self.config.as_dict()
