@@ -26,25 +26,33 @@ def admin_config():
     :returns: HTTP response
     """
 
+    admin_api: pygeoapi.admin.Admin = flask.current_app.extensions['pygeoapi']['admin_api']
     if flask.request.method == 'GET':
         return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
+            admin_api,
             pygeoapi.admin.get_config_,
             flask.request
         )
-
-    elif flask.request.method == 'PUT':
-        return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.put_config, flask.request,
-        )
-
-    elif flask.request.method == 'PATCH':
-        return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.patch_config,
-            flask.request,
-        )
+    elif flask.request.method in ('PUT', 'PATCH'):
+        pygeoapi_api: pygeoapi.api.API = flask.current_app.extensions['pygeoapi']['api']
+        if flask.request.method == 'PUT':
+            response = execute_from_flask(
+                admin_api,
+                pygeoapi.admin.put_config, flask.request,
+            )
+        else:
+            response = execute_from_flask(
+                admin_api,
+                pygeoapi.admin.patch_config,
+                flask.request,
+            )
+        if 200 <= response.status_code < 300:
+            pygeoapi_api.load_config(admin_api.config)
+            # TODO: regenerate openapi doc and reload it too
+        return response
+    else:
+        raise NotImplementedError(
+            f'request method {flask.request.method} is not implemented')
 
 
 @blueprint.route('/admin/config/resources', methods=['GET', 'POST'])

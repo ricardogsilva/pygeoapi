@@ -32,7 +32,11 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
+import os
 import sys
+
+from pygeoapi.util import yaml_load
 
 LOGGER = logging.getLogger(__name__)
 
@@ -123,3 +127,15 @@ def setup_logger(logging_config):
 
     LOGGER.debug('Logging initialized')
     return
+
+
+def _load_logging_config_from_env_variable() -> dict | None:
+    if (log_config_file_path := os.getenv('PYGEOAPI_LOG_CONFIG')) is not None:
+        try:
+            with Path(log_config_file_path).open() as fh:
+                return yaml_load(fh)
+        except FileNotFoundError:
+            raise FileNotFoundError('Logging configuration file not found')
+
+
+ENV_LOGGING_CONFIG = _load_logging_config_from_env_variable()

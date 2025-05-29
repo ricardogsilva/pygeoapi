@@ -69,6 +69,7 @@ from pygeoapi.util import (
     get_base_url, get_provider_by_type, get_provider_default, get_typed_value,
     get_crs_from_uri, get_supported_crs_list, render_j2_template, to_json
 )
+from pygeoapi.l10n import _cfg_cache
 
 LOGGER = logging.getLogger(__name__)
 
@@ -537,37 +538,31 @@ class API:
         :returns: `pygeoapi.API` instance
         """
 
-        self.config = config
-        self.openapi = openapi
-        self.api_headers = get_api_rules(self.config).response_headers
-        self.base_url = get_base_url(self.config)
+        self.load_config(config)
+        self.load_openapi_document(openapi)
         self.prefetcher = UrlPrefetcher()
 
+    def load_config(self, config) -> None:
+        _cfg_cache.clear()
+        self.config = config
+        self.locales = l10n.get_locales(config)
         CHARSET[0] = config['server'].get('encoding', 'utf-8')
         if config['server'].get('gzip'):
             FORMAT_TYPES[F_GZIP] = 'application/gzip'
             FORMAT_TYPES.move_to_end(F_JSON)
-
-        # Process language settings (first locale is default!)
-        self.locales = l10n.get_locales(config)
         self.default_locale = self.locales[0]
-
-        if 'templates' not in self.config['server']:
-            self.config['server']['templates'] = {'path': TEMPLATES}
-
-        if 'pretty_print' not in self.config['server']:
-            self.config['server']['pretty_print'] = False
-
+        self.api_headers = get_api_rules(self.config).response_headers
+        self.base_url = get_base_url(self.config)
         self.pretty_print = self.config['server']['pretty_print']
-
-        # setup_logger(self.config['logging'])
-
         # Create config clone for HTML templating with modified base URL
-        self.tpl_config = self.config.as_dict()
-        self.tpl_config['server']['url'] = self.base_url
-
+        templates_context = self.config.as_dict()
+        templates_context['server']['url'] = self.base_url
+        self.tpl_config = templates_context
         self.manager = get_manager(self.config)
         LOGGER.info('Process manager plugin loaded')
+
+    def load_openapi_document(self, openapi_document: dict) -> None:
+        self.openapi = openapi_document
 
     def get_exception(self, status, headers, format_, code,
                       description) -> Tuple[dict, int, str]:
@@ -735,6 +730,7 @@ def landing_page(api: API,
     :returns: tuple of headers, status code, content
     """
 
+    LOGGER.debug(f'{api.tpl_config["metadata"]["identification"]["title"]=}')
     fcm = {
         'links': [],
         'title': l10n.translate(
@@ -829,7 +825,6 @@ def landing_page(api: API,
                         if filter_providers_by_type(value['providers'],
                                                     'tile'):
                             fcm['tile'] = True
-
         content = render_j2_template(
             api.tpl_config, api.config['server']['templates'],
             'landing_page.html', fcm, request.locale)

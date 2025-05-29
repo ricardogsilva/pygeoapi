@@ -172,7 +172,7 @@ def get_config_(
 
     headers = request.get_response_headers()
 
-    cfg = get_config(raw=True)
+    cfg = admin.config.as_dict()
 
     if request.format == F_HTML:
         content = render_j2_template(
@@ -236,7 +236,8 @@ def put_config(
             400, headers, request.format, 'ValidationError', msg
         )
 
-    admin.write(data)
+    # admin.write(data)
+    admin.config.update(data)
 
     return headers, 204, {}
 
@@ -253,7 +254,7 @@ def patch_config(
     :returns: tuple of headers, status code, content
     """
 
-    config = deepcopy(admin.config)
+    config = admin.config.as_dict()
     headers = request.get_response_headers()
 
     data = request.data

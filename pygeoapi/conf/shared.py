@@ -2,6 +2,7 @@
 pygeoapi configuration management utilities allowing shared state across processes.
 """
 
+import logging
 import os
 from pathlib import Path
 from multiprocessing import Manager
@@ -13,6 +14,12 @@ from typing import (
 )
 
 from pygeoapi.util import yaml_load
+from pygeoapi.conf.defaults import (
+    DEFAULT_ENCODING,
+    DEFAULT_STATIC_PATH,
+    DEFAULT_TEMPLATES_PATH,
+    DEFAULT_MEDIA_TYPE
+)
 from pygeoapi.conf.readonly import (
     DictLikeRead,
     parse_resource_configuration,
@@ -21,16 +28,16 @@ from pygeoapi.conf.readonly import (
     PygeoapiServerConfiguration,
 )
 
-
-manager = Manager()
-shared_metadata_identification_config = manager.dict()
-shared_metadata_license_config = manager.dict()
-shared_metadata_provider_config = manager.dict()
-shared_metadata_contact_config = manager.dict()
-shared_server_config = manager.dict()
-shared_server_map_config = manager.dict()
-shared_server_process_manager_config = manager.dict()
-shared_resources_config = manager.dict()
+LOGGER = logging.getLogger(__name__)
+multiproccessing_manager = Manager()
+shared_metadata_identification_config = multiproccessing_manager.dict()
+shared_metadata_license_config = multiproccessing_manager.dict()
+shared_metadata_provider_config = multiproccessing_manager.dict()
+shared_metadata_contact_config = multiproccessing_manager.dict()
+shared_server_config = multiproccessing_manager.dict()
+shared_server_map_config = multiproccessing_manager.dict()
+shared_server_process_manager_config = multiproccessing_manager.dict()
+shared_resources_config = multiproccessing_manager.dict()
 
 
 class SharedAttributeRead:
@@ -72,16 +79,28 @@ class SharedDictLikeRead:
         except AttributeError as exc:
             raise KeyError() from exc
 
+    def __contains__(self, item: str) -> bool:
+        return item in self._shared_state
+
     def get(self, key: str, default: Any = None) -> Any:
         try:
             return self._shared_state.get(key)
         except KeyError:
             return default
 
+    def as_dict(self) -> dict:
+        return dict(self._shared_state)
+
+
+class SharedStateUpdateMixin:
+    _shared_state: DictProxy
+
+    def update(self, data: dict[str, Any]) -> None:
+        self._shared_state.update(data)
 
 
 class PygeoapiSharedMetadataIdentificationConfiguration(
-    SharedDictLikeRead, SharedAttributeRead
+    SharedDictLikeRead, SharedAttributeRead, SharedStateUpdateMixin
 ):
     title: dict[str, str]
     description: dict[str, str]
@@ -98,7 +117,11 @@ class PygeoapiSharedMetadataIdentificationConfiguration(
         self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataLicenseConfiguration(SharedDictLikeRead, SharedAttributeRead):
+class PygeoapiSharedMetadataLicenseConfiguration(
+    SharedDictLikeRead,
+    SharedAttributeRead,
+    SharedStateUpdateMixin,
+):
     name: str
     url: str
 
@@ -106,7 +129,11 @@ class PygeoapiSharedMetadataLicenseConfiguration(SharedDictLikeRead, SharedAttri
         self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataProviderConfiguration(SharedDictLikeRead, SharedAttributeRead):
+class PygeoapiSharedMetadataProviderConfiguration(
+    SharedDictLikeRead,
+    SharedAttributeRead,
+    SharedStateUpdateMixin,
+):
     name: str
     url: str
 
@@ -114,19 +141,23 @@ class PygeoapiSharedMetadataProviderConfiguration(SharedDictLikeRead, SharedAttr
         self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataContactConfiguration(SharedDictLikeRead, SharedAttributeRead):
+class PygeoapiSharedMetadataContactConfiguration(
+    SharedDictLikeRead,
+    SharedAttributeRead,
+    SharedStateUpdateMixin,
+):
     name: str
     position: str
     address: str
     city: str
-    state_or_province: str
-    postal_code: str
+    stateorprovince: str
+    postalcode: str
     country: str
     phone: str
     fax: str
     email: str
     url: str
-    hours_of_service: str
+    hours: str
     instructions: str
     role: str
 
@@ -136,7 +167,7 @@ class PygeoapiSharedMetadataContactConfiguration(SharedDictLikeRead, SharedAttri
         self._shared_state = shared_dict
 
 
-class PygeoapiSharedMetadataConfiguration:
+class PygeoapiSharedMetadataConfiguration(DictLikeRead):
     identification: PygeoapiSharedMetadataIdentificationConfiguration
     license: PygeoapiSharedMetadataLicenseConfiguration
     provider: PygeoapiSharedMetadataProviderConfiguration
@@ -149,36 +180,33 @@ class PygeoapiSharedMetadataConfiguration:
             shared_provider: DictProxy,
             shared_contact: DictProxy,
     ):
-        self.identification = PygeoapiSharedMetadataIdentificationConfiguration(shared_identification)
-        self.license = PygeoapiSharedMetadataLicenseConfiguration(shared_license)
-        self.provider = PygeoapiSharedMetadataProviderConfiguration(shared_provider)
-        self.contact = PygeoapiSharedMetadataContactConfiguration(shared_contact)
+        self.identification = PygeoapiSharedMetadataIdentificationConfiguration(
+            shared_identification)
+        self.license = PygeoapiSharedMetadataLicenseConfiguration(
+            shared_license)
+        self.provider = PygeoapiSharedMetadataProviderConfiguration(
+            shared_provider)
+        self.contact = PygeoapiSharedMetadataContactConfiguration(
+            shared_contact)
 
-    def __iter__(self) -> Iterator[str]:
-        for key in self.__dict__.keys():
-            yield key
+    def as_dict(self) -> dict:
+        return {
+            'identification': self.identification.as_dict(),
+            'license': self.license.as_dict(),
+            'provider': self.provider.as_dict(),
+            'contact': self.contact.as_dict(),
+        }
 
-    def __getitem__(self, key: str) -> (
-            PygeoapiSharedMetadataIdentificationConfiguration |
-            PygeoapiSharedMetadataLicenseConfiguration |
-            PygeoapiSharedMetadataProviderConfiguration |
-            PygeoapiSharedMetadataContactConfiguration
-    ):
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError() from exc
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
+    def update(self, data: dict[str, Any]) -> None:
+        for key, value in data.items():
+            if (attribute := getattr(self, key, None)) is not None:
+                attribute.update(value)
 
 
 class PygeoapiSharedMapConfiguration(
     SharedDictLikeRead,
-    SharedAttributeRead
+    SharedAttributeRead,
+    SharedStateUpdateMixin,
 ):
     url: str
     attribution: str
@@ -189,7 +217,7 @@ class PygeoapiSharedMapConfiguration(
         self._shared_state = shared_dict
 
 
-class PygeoapiSharedProcessesConfiguration:
+class PygeoapiSharedProcessesConfiguration(SharedStateUpdateMixin):
     _shared_state: DictProxy
 
     def __init__(self, shared_resources_configuration: DictProxy):
@@ -262,23 +290,40 @@ class PygeoapiSharedProcessManagerConfiguration(
         self.processes = PygeoapiSharedProcessesConfiguration(
             shared_resources_dict)
 
+    def get(self, key: str, default: Any = None) -> Any:
+        if key == 'processes':
+            return self.processes
+        else:
+            return super().get(key, default)
+
+    def as_dict(self) -> dict:
+        result = super().as_dict()
+        result['processes'] = self.processes.as_dict()
+        return result
+
+    def update(self, data: dict[str, Any]) -> None:
+        for key, value in data.items():
+            if key == 'processes':
+                self.processes.update(value)
+            else:
+                self._shared_state[key] = value
+
 
 class PygeoapiSharedServerConfiguration(
     SharedDictLikeRead,
     SharedAttributeRead,
 ):
-    enable_admin: bool
-    public_url: str
+    admin: bool
+    url: str
     mimetype: str
     encoding: str
-    gzip_responses: bool
     languages: list[str]
-    pretty_print_responses: bool
+    pretty_print: bool
     limit: int
     templates_path: str
     static_path: str
     map: PygeoapiSharedMapConfiguration
-    process_manager: PygeoapiSharedProcessManagerConfiguration | None
+    manager: PygeoapiSharedProcessManagerConfiguration | None
     ogc_schemas_location: str | None
 
     _shared_state: DictProxy
@@ -291,10 +336,34 @@ class PygeoapiSharedServerConfiguration(
     ):
         self._shared_state = shared_server_configuration
         self.map = map
-        self.process_manager = process_manager
+        self.manager = process_manager
+
+    def __getattr__(self, item: str):
+        if item == 'templates_path':
+            result = self._shared_state['templates'].get('path')
+        elif item == 'static_path':
+            result = self._shared_state['templates'].get('static')
+        else:
+            result = super().__getattr__(item)
+        return result
+
+    def as_dict(self) -> dict:
+        result = super().as_dict()
+        result.update({
+            'map': self.map.as_dict(),
+            'manager': self.manager.as_dict(),
+        })
+        return result
+
+    def update(self, data: dict[str, Any]) -> None:
+        for key, value in data.items():
+            if key in ('map', 'manager'):
+                getattr(self, key).update(value)
+            else:
+                self._shared_state[key] = value
 
 
-class PygeoapiSharedResourcesConfiguration:
+class PygeoapiSharedResourcesConfiguration(SharedStateUpdateMixin):
     _shared_state: DictProxy
 
     def __init__(self, shared_resources_configuration: DictProxy):
@@ -349,7 +418,6 @@ class PygeoapiSharedResourcesConfiguration:
         }
 
 
-
 class PygeoapiSharedConfiguration(DictLikeRead):
     """ConfigurationManager implementation that shares state across processes.
     """
@@ -369,65 +437,81 @@ class PygeoapiSharedConfiguration(DictLikeRead):
         self.resources = resources
 
     @classmethod
+    def from_dict(cls, data: dict[str, Any]):
+        global shared_metadata_identification_config
+        shared_metadata_identification_config.update(
+            data['metadata']['identification']
+        )
+
+        global shared_metadata_license_config
+        shared_metadata_license_config.update(
+            data['metadata']['license']
+        )
+
+        global shared_metadata_provider_config
+        shared_metadata_provider_config.update(
+            data['metadata']['provider']
+        )
+
+        global shared_metadata_contact_config
+        shared_metadata_contact_config.update(
+            data['metadata']['contact']
+        )
+
+        global shared_server_config
+        shared_server_config.update(data['server'])
+        if shared_server_config.get('mimetype') is None:
+            shared_server_config['mimetype'] = DEFAULT_MEDIA_TYPE
+        if shared_server_config.get('encoding') is None:
+            shared_server_config['encoding'] = DEFAULT_ENCODING
+        if (shared_server_config.get('templates', {}).get('path')) is None:
+            templates_dict = shared_server_config.setdefault('templates', {})
+            templates_dict['path'] = DEFAULT_TEMPLATES_PATH
+            shared_server_config['templates'] = templates_dict
+        if (shared_server_config.get('templates', {}).get('static')) is None:
+            templates_dict = shared_server_config.setdefault('templates', {})
+            templates_dict['static'] = DEFAULT_STATIC_PATH
+            shared_server_config['templates'] = templates_dict
+
+        del shared_server_config['map']
+        del shared_server_config['manager']
+
+        global shared_server_map_config
+        shared_server_map_config.update(data['server']['map'])
+
+        global shared_server_process_manager_config
+        shared_server_process_manager_config.update(
+            data['server'].get('manager', {}))
+
+        global shared_resources_config
+        shared_resources_config.update(data['resources'])
+
+        return cls(
+            metadata=PygeoapiSharedMetadataConfiguration(
+                shared_identification=shared_metadata_identification_config,
+                shared_license=shared_metadata_license_config,
+                shared_provider=shared_metadata_provider_config,
+                shared_contact=shared_metadata_contact_config,
+            ),
+            server=PygeoapiSharedServerConfiguration(
+                shared_server_configuration=shared_server_config,
+                map=PygeoapiSharedMapConfiguration(shared_server_map_config),
+                process_manager=PygeoapiSharedProcessManagerConfiguration(
+                    shared_server_process_manager_config,
+                    shared_resources_config
+                ),
+            ),
+            resources=PygeoapiSharedResourcesConfiguration(shared_resources_config)
+        )
+
+    @classmethod
     def from_configuration_file(
             cls, configuration_file_path: str
     ) -> 'PygeoapiSharedConfiguration':
         if (conf_path := Path(configuration_file_path)).exists():
             with conf_path.open('r', encoding='utf-8') as fh:
                 raw_conf = yaml_load(fh)
-
-            global shared_metadata_identification_config
-            shared_metadata_identification_config.update(
-                raw_conf['metadata']['identification']
-            )
-
-            global shared_metadata_license_config
-            shared_metadata_license_config.update(
-                raw_conf['metadata']['license']
-            )
-
-            global shared_metadata_provider_config
-            shared_metadata_provider_config.update(
-                raw_conf['metadata']['provider']
-            )
-
-            global shared_metadata_contact_config
-            shared_metadata_contact_config.update(
-                raw_conf['metadata']['contact']
-            )
-
-            global shared_server_config
-            shared_server_config.update(raw_conf['server'])
-            del shared_server_config['map']
-            del shared_server_config['manager']
-
-            global shared_server_map_config
-            shared_server_map_config.update(raw_conf['server']['map'])
-
-            global shared_server_process_manager_config
-            shared_server_process_manager_config.update(
-                raw_conf['server'].get('manager', {}))
-
-            global shared_resources_config
-            shared_resources_config.update(raw_conf['resources'])
-
-            return cls(
-                metadata=PygeoapiSharedMetadataConfiguration(
-                    shared_identification=shared_metadata_identification_config,
-                    shared_license=shared_metadata_license_config,
-                    shared_provider=shared_metadata_provider_config,
-                    shared_contact=shared_metadata_contact_config,
-                ),
-                server=PygeoapiSharedServerConfiguration(
-                    shared_server_configuration=shared_server_config,
-                    map=PygeoapiSharedMapConfiguration(shared_server_map_config),
-                    process_manager=PygeoapiSharedProcessManagerConfiguration(
-                        shared_server_process_manager_config,
-                        shared_resources_config
-                    ),
-                ),
-                resources=PygeoapiSharedResourcesConfiguration(shared_resources_config)
-            )
+                return cls.from_dict(raw_conf)
         else:
             raise RuntimeError(
                 f'Configuration file {configuration_file_path} does not exist')
@@ -438,3 +522,17 @@ class PygeoapiSharedConfiguration(DictLikeRead):
             return cls.from_configuration_file(config_path)
         else:
             raise RuntimeError('PYGEOAPI_CONFIG environment variable not set')
+
+    def as_dict(self) -> dict:
+        return {
+            'metadata': self.metadata.as_dict(),
+            'server': self.server.as_dict(),
+            'resources': self.resources.as_dict()
+        }
+
+    def update(self, data: dict[str, Any]) -> None:
+        for key, value in data.items():
+            if (attribute := getattr(self, key)) is not None:
+                attribute.update(value)
+            else:
+                raise RuntimeError(f'Attribute {key!r} not found')

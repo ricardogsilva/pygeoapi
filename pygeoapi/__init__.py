@@ -32,8 +32,8 @@
 
 __version__ = '0.21.dev0'
 
+import logging.config
 import os
-from pathlib import Path
 
 import click
 try:
@@ -48,15 +48,11 @@ from pygeoapi import flask_application
 from pygeoapi.api import API
 from pygeoapi.conf import initialize_configuration
 from pygeoapi.openapi import get_oas
-from pygeoapi.config import (
-    config,
-    get_config,
-)
-from pygeoapi.openapi import (
-    load_openapi_document,
-    openapi,
-)
+from pygeoapi.config import config
+from pygeoapi.log import ENV_LOGGING_CONFIG
+from pygeoapi.openapi import openapi
 
+LOGGER = logging.getLogger(__name__)
 
 
 def _find_plugins():
@@ -94,7 +90,10 @@ def _find_plugins():
 @click.group()
 @click.version_option(version=__version__)
 def cli():
-    pass
+    if ENV_LOGGING_CONFIG is not None:
+        logging.config.dictConfig(ENV_LOGGING_CONFIG)
+    else:
+        logging.basicConfig(level=logging.WARNING)
 
 
 @_find_plugins()
@@ -114,38 +113,35 @@ def serve(ctx, server):
     """Run the server with different daemon type (--flask is the default)"""
     pygeoapi_config = initialize_configuration(
         os.getenv('PYGEOAPI_CONFIG_INITIALIZER'))
-    print("Initialized pygeoapi config")
+    LOGGER.info("Initialized pygeoapi config")
     openapi_document = get_oas(pygeoapi_config)
-    print("Generated OpenAPI document")
+    LOGGER.info("Generated OpenAPI document")
     pygeoapi_api = API(pygeoapi_config, openapi_document)
-    print("Initialized pygeoapi API")
+    LOGGER.info("Initialized pygeoapi API")
+    bind_host = os.getenv('PYGEOAPI_BIND_HOST', 'localhost')
+    bind_port = int(os.getenv('PYGEOAPI_BIND_PORT', '5000'))
     if server == 'flask':
-        bind_host = os.getenv('PYGEOAPI_FLASK_BIND_HOST', 'localhost')
-        bind_port = os.getenv('PYGEOAPI_FLASK_BIND_PORT', '5000')
         app = flask_application.get_app_from_pygeoapi_api(pygeoapi_api)
-        app.run(debug=True, host=bind_host, port=int(bind_port))
-    elif (config_path:=os.getenv('PYGEOAPI_CONFIG')) is not None:
-        if server == "starlette":
-            from pygeoapi.starlette_app import serve as serve_starlette
-            ctx.invoke(serve_starlette)
-        elif server == "starlette_application":
-            log_level = 'info'
-            if pygeoapi_api.config['server'].get('debug', False):
-                log_level = 'debug'
-            uvicorn.run(
-                "pygeoapi.starlette_application:get_app",
-                reload=True,
-                log_level=log_level,
-                loop='asyncio',
-                host=pygeoapi_api.config['server']['bind']['host'],
-                port=pygeoapi_api.config['server']['bind']['port'])
-        elif server == "django":
-            from pygeoapi.django_app import main as serve_django
-            ctx.invoke(serve_django)
-        else:
-            raise click.ClickException('--flask/--starlette/--django is required')
+        app.run(debug=True, host=bind_host, port=bind_port)
+    elif server == "starlette":
+        from pygeoapi.starlette_app import serve as serve_starlette
+        ctx.invoke(serve_starlette)
+    elif server == "starlette_application":
+        log_level = 'info'
+        if pygeoapi_api.config['server'].get('debug', False):
+            log_level = 'debug'
+        uvicorn.run(
+            "pygeoapi.starlette_application:get_app",
+            reload=True,
+            log_level=log_level,
+            loop='asyncio',
+            host=bind_host,
+            port=bind_port)
+    elif server == "django":
+        from pygeoapi.django_app import main as serve_django
+        ctx.invoke(serve_django)
     else:
-        raise RuntimeError('PYGEOAPI_CONFIG environment variable not set')
+        raise click.ClickException('--flask/--starlette/--django is required')
 
 
 

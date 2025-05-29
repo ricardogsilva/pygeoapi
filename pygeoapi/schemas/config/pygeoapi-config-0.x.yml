@@ -154,7 +154,6 @@ properties:
                         type: string
                         description: API version response header (leave empty or unset to omit this header)
         required:
-            - bind
             - url
             - mimetype
             - encoding
@@ -643,6 +642,5 @@ definitions:
                                         type: integer
 required:
     - server
-    - logging
     - metadata
     - resources

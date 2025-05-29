@@ -13,6 +13,12 @@ from typing import (
 )
 
 from pygeoapi.util import yaml_load
+from pygeoapi.conf.defaults import (
+    DEFAULT_ENCODING,
+    DEFAULT_MEDIA_TYPE,
+    DEFAULT_STATIC_PATH,
+    DEFAULT_TEMPLATES_PATH,
+)
 from pygeoapi.conf.protocols import (
     InternationalizationArray,
     InternationalizationString, CollectionResourceConfiguration,
@@ -409,8 +415,6 @@ class PygeoapiServerConfiguration(DictLikeRead):
             ],
             processes: Sequence[PygeoapiProcessResourceConfiguration] | None = None
     ) -> 'PygeoapiServerConfiguration':
-        default_templates_path = Path(__file__).parent / 'templates'
-        default_static_path = Path(__file__).parent / 'static'
         process_manager_conf = PygeoapiProcessManagerConfiguration(
             name='Dummy')
         if (raw_process_manager_conf := values.get('manager')) is not None:
@@ -419,17 +423,17 @@ class PygeoapiServerConfiguration(DictLikeRead):
         return cls(
             admin=values['admin'],
             url=values['url'],
-            mimetype=values.get('mimetype', 'application/json; charset=UTF-8'),
-            encoding=values.get('encoding', 'utf-8'),
+            mimetype=values.get('mimetype', DEFAULT_MEDIA_TYPE),
+            encoding=values.get('encoding', DEFAULT_ENCODING),
             languages=values.get(
                 'languages', ['en']
             ),
             pretty_print=values.get('pretty_print', False),
             limit=values.get('limit', 10),
             templates_path=values.get(
-                'templates', {}).get('path', default_templates_path),
+                'templates', {}).get('path', DEFAULT_TEMPLATES_PATH),
             static_path=values.get(
-                'templates', {}).get('static', default_static_path),
+                'templates', {}).get('static', DEFAULT_STATIC_PATH),
             map=PygeoapiMapConfiguration.from_dict(values['map']),
             manager=process_manager_conf,
             ogc_schemas_location=values.get('ogc_schemas_location'),

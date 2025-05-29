@@ -23,7 +23,6 @@ def execute_from_flask(
         request: Request,
         *args,
         skip_valid_check=False,
-        alternative_api=None
 ) -> Response:
     """
     Executes API function from Flask

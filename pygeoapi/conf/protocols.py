@@ -250,7 +250,9 @@ class ConfigurationManager(DictLikeRead, Protocol):
 
     def as_dict(self) -> dict[str, dict[str, Any]]:
         """Return a dict representation of the configuration."""
-        ...
+
+    def update(self, data: dict[str, Any]):
+        """Update configuration from the input data"""
 
 
 class ConfigurationInitializer(Protocol):

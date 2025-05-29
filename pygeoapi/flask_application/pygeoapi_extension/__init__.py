@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional
 
 import flask
@@ -22,10 +21,7 @@ class PygeoapiFlaskExtension:
     def init_app(self, pygeoapi_api: API, app: flask.Flask):
         api_rules = get_api_rules(pygeoapi_api.config)
         url_prefix = api_rules.get_url_prefix('flask')
-        static_folder = pygeoapi_api.config['server'].get(
-            'static_directory',
-            Path(__file__).parents[2] / 'static'
-        )
+        static_folder = pygeoapi_api.config['server']['templates']['static']
         core.configure_blueprint(
             pygeoapi_api,
             static_folder,
