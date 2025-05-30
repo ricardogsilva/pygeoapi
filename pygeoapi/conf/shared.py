@@ -13,7 +13,13 @@ from typing import (
     Union,
 )
 
-from pygeoapi.util import yaml_load
+import json
+import jsonschema
+
+from pygeoapi.util import (
+    yaml_load,
+    to_json,
+)
 from pygeoapi.conf.defaults import (
     DEFAULT_ENCODING,
     DEFAULT_STATIC_PATH,
@@ -425,6 +431,7 @@ class PygeoapiSharedConfiguration(DictLikeRead):
     metadata: PygeoapiSharedMetadataConfiguration
     server: PygeoapiSharedServerConfiguration
     resources: PygeoapiSharedResourcesConfiguration
+    _schema: dict
 
     def __init__(
             self,
@@ -435,6 +442,10 @@ class PygeoapiSharedConfiguration(DictLikeRead):
         self.metadata = metadata
         self.server = server
         self.resources = resources
+        schema_path = Path(
+            __file__).parents[1] / 'schemas/config/pygeoapi-config-0.x.yml'
+        with schema_path.open() as fh:
+            self._schema = yaml_load(fh)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]):
@@ -529,6 +540,17 @@ class PygeoapiSharedConfiguration(DictLikeRead):
             'server': self.server.as_dict(),
             'resources': self.resources.as_dict()
         }
+
+    def validate_data(self, data: dict) -> bool:
+        try:
+            # this code does a JSON round trip in order to ensure everything
+            # in `data` (like datetimes, which pyyaml would have parsed from
+            # string to datetime) is comparable
+            jsonschema.validate(json.loads(to_json(data)), schema=self._schema)
+            return True
+        except (jsonschema.ValidationError, jsonschema.SchemaError) as exc:
+            LOGGER.error(exc)
+            return False
 
     def update(self, data: dict[str, Any]) -> None:
         for key, value in data.items():

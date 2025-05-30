@@ -4,6 +4,7 @@ from typing import (
     Literal,
     Protocol,
     TypeAlias,
+    Union,
 )
 
 InternationalizationString: TypeAlias = str | dict[str, str]
@@ -251,8 +252,34 @@ class ConfigurationManager(DictLikeRead, Protocol):
     def as_dict(self) -> dict[str, dict[str, Any]]:
         """Return a dict representation of the configuration."""
 
+    def validate_data(self, data: dict[str, Any]) -> bool:
+        """Check if the input data represents a valid configuration."""
+
     def update(self, data: dict[str, Any]):
         """Update configuration from the input data"""
+
+    def add_resource(
+            self,
+            resource: Union[
+                CollectionResourceConfiguration, ProcessResourceConfiguration
+            ]
+    ) -> Union[
+        CollectionResourceConfiguration, ProcessResourceConfiguration
+    ]:
+        """Add a new resource to the configuration."""
+
+    def update_resource(
+            self,
+            resource: Union[
+                CollectionResourceConfiguration, ProcessResourceConfiguration
+            ]
+    ) -> Union[
+        CollectionResourceConfiguration, ProcessResourceConfiguration
+    ]:
+        """Update an exiting resource configuration."""
+
+    def remove_resource(self, resource_identifier: str) -> None:
+        """Remove a resource from the configuration."""
 
 
 class ConfigurationInitializer(Protocol):

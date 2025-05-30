@@ -3,6 +3,7 @@ import flask
 import pygeoapi.api
 import pygeoapi.admin
 from pygeoapi.flask_application.pygeoapi_extension.views.util import execute_from_flask
+from pygeoapi.openapi import get_oas
 
 blueprint = flask.Blueprint('admin', __name__)
 
@@ -26,7 +27,8 @@ def admin_config():
     :returns: HTTP response
     """
 
-    admin_api: pygeoapi.admin.Admin = flask.current_app.extensions['pygeoapi']['admin_api']
+    admin_api: pygeoapi.admin.Admin = flask.current_app.extensions[
+        'pygeoapi']['admin_api']
     if flask.request.method == 'GET':
         return execute_from_flask(
             admin_api,
@@ -34,7 +36,6 @@ def admin_config():
             flask.request
         )
     elif flask.request.method in ('PUT', 'PATCH'):
-        pygeoapi_api: pygeoapi.api.API = flask.current_app.extensions['pygeoapi']['api']
         if flask.request.method == 'PUT':
             response = execute_from_flask(
                 admin_api,
@@ -47,8 +48,10 @@ def admin_config():
                 flask.request,
             )
         if 200 <= response.status_code < 300:
-            pygeoapi_api.load_config(admin_api.config)
-            # TODO: regenerate openapi doc and reload it too
+            _reload_pygeoapi_api(
+                flask.current_app.extensions['pygeoapi']['api'],
+                admin_api.config
+            )
         return response
     else:
         raise NotImplementedError(
@@ -63,15 +66,24 @@ def admin_config_resources():
     :returns: HTTP response
     """
 
+    admin_api: pygeoapi.admin.Admin = flask.current_app.extensions[
+        'pygeoapi']['admin_api']
     if flask.request.method == 'GET':
         return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.get_resources, flask.request)
+            admin_api, pygeoapi.admin.get_resources, flask.request)
 
     elif flask.request.method == 'POST':
-        return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.post_resource, flask.request)
+        response = execute_from_flask(
+            admin_api, pygeoapi.admin.post_resource, flask.request)
+        if 200 <= response.status_code < 300:
+            _reload_pygeoapi_api(
+                flask.current_app.extensions['pygeoapi']['api'],
+                admin_api.config
+            )
+        return response
+    else:
+        raise NotImplementedError(
+            f'request method {flask.request.method} is not implemented')
 
 
 @blueprint.route(
@@ -84,34 +96,52 @@ def admin_config_resource(resource_id):
     :returns: HTTP response
     """
 
+    admin_api: pygeoapi.admin.Admin = flask.current_app.extensions[
+        'pygeoapi']['admin_api']
     if flask.request.method == 'GET':
         return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
+            admin_api,
             pygeoapi.admin.get_resource,
             flask.request,
             resource_id
         )
+    else:
+        if flask.request.method == 'DELETE':
+            response = execute_from_flask(
+                admin_api,
+                pygeoapi.admin.delete_resource,
+                flask.request,
+                resource_id
+            )
 
-    elif flask.request.method == 'DELETE':
-        return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.delete_resource,
-            flask.request,
-            resource_id
-        )
+        elif flask.request.method == 'PUT':
+            response = execute_from_flask(
+                admin_api,
+                pygeoapi.admin.put_resource,
+                flask.request,
+                resource_id
+            )
 
-    elif flask.request.method == 'PUT':
-        return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.put_resource,
-            flask.request,
-            resource_id
-        )
+        elif flask.request.method == 'PATCH':
+            response = execute_from_flask(
+                admin_api,
+                pygeoapi.admin.patch_resource,
+                flask.request,
+                resource_id
+            )
+        else:
+            raise NotImplementedError(
+                f'request method {flask.request.method} is not implemented')
+        if 200 <= response.status_code < 300:
+            _reload_pygeoapi_api(
+                flask.current_app.extensions['pygeoapi']['api'],
+                admin_api.config
+            )
+        return response
 
-    elif flask.request.method == 'PATCH':
-        return execute_from_flask(
-            flask.current_app.extensions['pygeoapi']['admin_api'],
-            pygeoapi.admin.patch_resource,
-            flask.request,
-            resource_id
-        )
+
+def _reload_pygeoapi_api(
+        pygeoapi_api: pygeoapi.api.API, new_config
+) -> None:
+    pygeoapi_api.load_config(new_config)
+    pygeoapi_api.openapi = get_oas(pygeoapi_api.config)

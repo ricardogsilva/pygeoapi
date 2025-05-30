@@ -539,7 +539,7 @@ class API:
         """
 
         self.load_config(config)
-        self.load_openapi_document(openapi)
+        self.openapi = openapi
         self.prefetcher = UrlPrefetcher()
 
     def load_config(self, config) -> None:
@@ -560,9 +560,6 @@ class API:
         self.tpl_config = templates_context
         self.manager = get_manager(self.config)
         LOGGER.info('Process manager plugin loaded')
-
-    def load_openapi_document(self, openapi_document: dict) -> None:
-        self.openapi = openapi_document
 
     def get_exception(self, status, headers, format_, code,
                       description) -> Tuple[dict, int, str]:

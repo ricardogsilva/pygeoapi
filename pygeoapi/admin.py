@@ -40,6 +40,7 @@ from jsonpatch import make_patch
 from jsonschema.exceptions import ValidationError
 
 from pygeoapi.api import API, APIRequest, F_HTML
+from pygeoapi.conf.protocols import ConfigurationManager
 from pygeoapi.config import get_config, validate_config
 from pygeoapi.openapi import get_oas
 from pygeoapi.util import to_json, render_j2_template, yaml_dump
@@ -227,19 +228,16 @@ def put_config(
         )
 
     LOGGER.debug('Updating configuration')
-    try:
-        admin.validate(data)
-    except ValidationError as err:
-        LOGGER.error(err)
+    conf: ConfigurationManager = admin.config
+    if conf.validate_data(data):
+        # admin.write(data)
+        conf.update(data)
+        return headers, 204, {}
+    else:
         msg = 'Schema validation error'
         return admin.get_exception(
             400, headers, request.format, 'ValidationError', msg
         )
-
-    # admin.write(data)
-    admin.config.update(data)
-
-    return headers, 204, {}
 
 
 def patch_config(
@@ -254,7 +252,6 @@ def patch_config(
     :returns: tuple of headers, status code, content
     """
 
-    config = admin.config.as_dict()
     headers = request.get_response_headers()
 
     data = request.data
@@ -283,22 +280,18 @@ def patch_config(
         )
 
     LOGGER.debug('Merging configuration')
-    config = admin.merge(config, data)
-
-    try:
-        admin.validate(config)
-    except ValidationError as err:
-        LOGGER.error(err)
+    conf: ConfigurationManager = admin.config
+    merged_config = admin.merge(conf.as_dict(), data)
+    if conf.validate_data(merged_config):
+        # admin.write(config)
+        conf.update(merged_config)
+        content = to_json(conf.as_dict(), admin.pretty_print)
+        return headers, 204, content
+    else:
         msg = 'Schema validation error'
         return admin.get_exception(
             400, headers, request.format, 'ValidationError', msg
         )
-
-    admin.write(config)
-
-    content = to_json(config, admin.pretty_print)
-
-    return headers, 204, content
 
 
 def get_resources(
