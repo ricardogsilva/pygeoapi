@@ -20,8 +20,10 @@ from pygeoapi.conf.defaults import (
     DEFAULT_TEMPLATES_PATH,
 )
 from pygeoapi.conf.protocols import (
+    CollectionResourceConfiguration,
     InternationalizationArray,
-    InternationalizationString, CollectionResourceConfiguration,
+    InternationalizationString,
+    ProcessResourceConfiguration,
 )
 _default_crs = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
 _default_crs_list = partial(list, [_default_crs])
@@ -276,6 +278,9 @@ class PygeoapiProcessResourceConfiguration(DictLikeRead):
             type=values['type'],
             processor=PygeoapiProcessorConfiguration.from_dict(values['processor'])
         )
+
+    def as_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
 
 
 class PygeoapiProcessesConfiguration:
@@ -711,6 +716,9 @@ class PygeoapiCollectionResourceConfiguration(DictLikeRead):
             ),
         )
 
+    def as_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
 
 class PygeoapiResourcesConfiguration:
     _resources: dict[
@@ -741,7 +749,7 @@ class PygeoapiResourcesConfiguration:
     def __getitem__(
             self,
             key: str
-    ) -> Union[PygeoapiCollectionResourceConfiguration, PygeoapiProcessorConfiguration]:
+    ) -> Union[CollectionResourceConfiguration, ProcessResourceConfiguration]:
         return self._resources[key]
 
     def get(self, resource_identifier: str, default: Any = None) -> Any:
@@ -828,8 +836,8 @@ class PygeoapiConfiguration(DictLikeRead):
 def parse_resource_configuration(
         resource_id: str, resource_conf: dict[str, Any]
 ) -> Union[
-    PygeoapiCollectionResourceConfiguration,
-    PygeoapiProcessResourceConfiguration
+    CollectionResourceConfiguration,
+    ProcessResourceConfiguration
 ]:
     match resource_conf.get('type'):
         case 'collection' | 'stac-collection':

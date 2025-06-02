@@ -137,9 +137,13 @@ class ProcessorConfiguration(Protocol):
 
 
 class ProcessResourceConfiguration(Protocol):
+    identifier: str
     name: str
     type: Literal['process']
     processor: ProcessorConfiguration
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return a representation of the process configuration as a dict."""
 
 
 class CollectionProviderGeometryConfiguration(DictLikeRead, Protocol):
@@ -219,6 +223,9 @@ class CollectionResourceConfiguration(DictLikeRead, Protocol):
     extents: CollectionResourceExtentsConfiguration
     limits: LimitsConfiguration | None
     providers: list[CollectionProviderConfiguration]
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return a representation of the collection configuration as a dict."""
 
 
 class ResourcesConfiguration(DictLikeRead, Protocol):

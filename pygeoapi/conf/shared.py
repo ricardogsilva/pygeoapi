@@ -20,6 +20,10 @@ from pygeoapi.util import (
     yaml_load,
     to_json,
 )
+from pygeoapi.conf.protocols import (
+    ProcessResourceConfiguration,
+    CollectionResourceConfiguration,
+)
 from pygeoapi.conf.defaults import (
     DEFAULT_ENCODING,
     DEFAULT_STATIC_PATH,
@@ -31,7 +35,6 @@ from pygeoapi.conf.readonly import (
     parse_resource_configuration,
     PygeoapiCollectionResourceConfiguration,
     PygeoapiProcessResourceConfiguration,
-    PygeoapiServerConfiguration,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -238,7 +241,7 @@ class PygeoapiSharedProcessesConfiguration(SharedStateUpdateMixin):
     def __getitem__(
             self,
             key: str
-    ) -> PygeoapiProcessResourceConfiguration:
+    ) -> ProcessResourceConfiguration:
         raw_resource = self._shared_state[key]
         if raw_resource['type'] == 'process':
             return parse_resource_configuration(key, raw_resource)
@@ -275,6 +278,15 @@ class PygeoapiSharedProcessesConfiguration(SharedStateUpdateMixin):
         return {
             k: v for k, v in self._shared_state.items() if v['type'] == 'process'
         }
+
+    def add(
+            self,
+            process_config: ProcessResourceConfiguration
+    ) -> ProcessResourceConfiguration:
+        if process_config.identifier in self._shared_state:
+            raise RuntimeError(f'Process {process_config.identifier!r} already exists')
+        self._shared_state[process_config.identifier] = process_config.as_dict()
+        return self[process_config.identifier]
 
 
 class PygeoapiSharedProcessManagerConfiguration(
@@ -383,8 +395,8 @@ class PygeoapiSharedResourcesConfiguration(SharedStateUpdateMixin):
             self,
             key: str
     ) -> Union[
-        PygeoapiCollectionResourceConfiguration,
-        PygeoapiProcessResourceConfiguration
+        CollectionResourceConfiguration,
+        ProcessResourceConfiguration
     ]:
         raw_resource = self._shared_state[key]
         return parse_resource_configuration(key, raw_resource)
@@ -422,6 +434,39 @@ class PygeoapiSharedResourcesConfiguration(SharedStateUpdateMixin):
         return {
             k: v for k, v in self._shared_state.items()
         }
+
+    def add(
+            self,
+            resource: Union[
+                CollectionResourceConfiguration,
+                ProcessResourceConfiguration
+            ]
+    ) -> Union[CollectionResourceConfiguration, ProcessResourceConfiguration]:
+        if resource.identifier in self._shared_state:
+            raise RuntimeError(f'resource {resource.identifier!r} already exists')
+        self._shared_state[resource.identifier] = resource.as_dict()
+        return self[resource.identifier]
+
+    def update(
+            self,
+            resource: Union[
+                CollectionResourceConfiguration,
+                ProcessResourceConfiguration
+            ]
+    ) -> Union[
+        CollectionResourceConfiguration,
+        ProcessResourceConfiguration
+    ]:
+        if resource.identifier not in self._shared_state:
+            raise RuntimeError(f'resource {resource.identifier!r} does not exist')
+        self._shared_state[resource.identifier] = resource.as_dict()
+        return self[resource.identifier]
+
+    def remove(self, resource_identifier: str) -> None:
+        try:
+            del self._shared_state[resource_identifier]
+        except KeyError as exc:
+            raise RuntimeError(f'resource {resource_identifier!r} does not exist') from exc
 
 
 class PygeoapiSharedConfiguration(DictLikeRead):
@@ -485,14 +530,21 @@ class PygeoapiSharedConfiguration(DictLikeRead):
             shared_server_config['templates'] = templates_dict
 
         del shared_server_config['map']
-        del shared_server_config['manager']
 
         global shared_server_map_config
         shared_server_map_config.update(data['server']['map'])
 
+        try:
+            del shared_server_config['manager']
+        except KeyError:
+            pass
+
         global shared_server_process_manager_config
         shared_server_process_manager_config.update(
-            data['server'].get('manager', {}))
+            data['server'].get(
+                'manager', {'name': 'Dummy'}
+            )
+        )
 
         global shared_resources_config
         shared_resources_config.update(data['resources'])
@@ -558,3 +610,27 @@ class PygeoapiSharedConfiguration(DictLikeRead):
                 attribute.update(value)
             else:
                 raise RuntimeError(f'Attribute {key!r} not found')
+
+    def add_resource(
+            self,
+            resource: Union[
+                CollectionResourceConfiguration,
+                ProcessResourceConfiguration,
+            ]
+    ) -> Union[
+        CollectionResourceConfiguration,
+        ProcessResourceConfiguration,
+    ]:
+        return self.resources.add(resource)
+
+    def update_resource(
+            self,
+            resource: Union[
+                CollectionResourceConfiguration,
+                ProcessResourceConfiguration
+            ]
+    ):
+        return self.resources.update(resource)
+
+    def remove_resource(self, resource_identifier: str) -> None:
+        return self.resources.remove(resource_identifier)
