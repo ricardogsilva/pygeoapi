@@ -306,16 +306,15 @@ def get_resources(
     """
 
     headers = request.get_response_headers()
-
-    cfg = get_config(raw=True)
+    conf = admin.config.as_dict()
 
     if request.format == F_HTML:
         content = render_j2_template(
-            admin.tpl_config, admin.config['server']['templates'],
-            'admin/index.html', cfg['resources'], request.locale
+            admin.tpl_config, conf['server']['templates'],
+            'admin/index.html', conf['resources'], request.locale
         )
     else:
-        content = to_json(cfg['resources'], admin.pretty_print)
+        content = to_json(conf['resources'], admin.pretty_print)
 
     return headers, 200, content
 
@@ -331,7 +330,6 @@ def post_resource(
     :returns: tuple of headers, status code, content
     """
 
-    config = deepcopy(admin.config)
     headers = request.get_response_headers()
 
     data = request.data
@@ -361,7 +359,8 @@ def post_resource(
 
     resource_id = next(iter(data.keys()))
 
-    if config['resources'].get(resource_id) is not None:
+    conf: ConfigurationManager = admin.config
+    if resource_id in conf.resources:
         # Resource already exists
         msg = f'Resource exists: {resource_id}'
         LOGGER.error(msg)
@@ -370,18 +369,16 @@ def post_resource(
         )
 
     LOGGER.debug(f'Adding resource: {resource_id}')
-    config['resources'].update(data)
-
-    try:
-        admin.validate(config)
-    except ValidationError as err:
-        LOGGER.error(err)
+    new_config = conf.as_dict()
+    new_config['resources'].update(data)
+    if not conf.validate_data(new_config):
         msg = 'Schema validation error'
         return admin.get_exception(
             400, headers, request.format, 'ValidationError', msg
         )
 
-    admin.write(config)
+    conf.update(new_config)
+    # admin.write(config)
 
     content = f'Location: /{request.path_info}/{resource_id}'
     LOGGER.debug(f'Success at {content}')

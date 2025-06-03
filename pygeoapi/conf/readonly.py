@@ -16,6 +16,7 @@ from pygeoapi.util import yaml_load
 from pygeoapi.conf.defaults import (
     DEFAULT_ENCODING,
     DEFAULT_MEDIA_TYPE,
+    DEFAULT_SPATIAL_CRS,
     DEFAULT_STATIC_PATH,
     DEFAULT_TEMPLATES_PATH,
 )
@@ -25,8 +26,7 @@ from pygeoapi.conf.protocols import (
     InternationalizationString,
     ProcessResourceConfiguration,
 )
-_default_crs = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
-_default_crs_list = partial(list, [_default_crs])
+_default_crs_list = partial(list, [DEFAULT_SPATIAL_CRS])
 
 
 class DictLikeRead:
@@ -453,7 +453,7 @@ class PygeoapiServerConfiguration(DictLikeRead):
 @dataclasses.dataclass
 class PygeoapiCollectionResourceSpatialExtentConfiguration(DictLikeRead):
     bbox: tuple[float, float, float, float] | tuple[float, float, float, float, float, float]
-    crs: str = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
+    crs: str = DEFAULT_SPATIAL_CRS
 
     @classmethod
     def from_dict(
@@ -566,7 +566,7 @@ class PygeoapiCollectionProviderConfiguration(DictLikeRead):
     options: dict[str, Any] | None = None
     properties: list[str] | None = None
     crs: list[str] = dataclasses.field(default_factory=_default_crs_list)
-    storage_crs: str = _default_crs
+    storage_crs: str = DEFAULT_SPATIAL_CRS
     storage_crs_coordinate_epoch: str | None = None
 
     @classmethod
@@ -617,7 +617,7 @@ class PygeoapiCollectionProviderConfiguration(DictLikeRead):
                 if (raw_crs := values.get('crs')) is not None
                 else _default_crs_list()
             ),
-            storage_crs=values.get('storage_crs', _default_crs),
+            storage_crs=values.get('storage_crs', DEFAULT_SPATIAL_CRS),
             storage_crs_coordinate_epoch=values.get('storage_crs_coordinate_epoch'),
         )
 

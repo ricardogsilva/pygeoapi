@@ -1,0 +1,65 @@
+# An example log configuration for pygeoapi
+#
+# Copy this, tweak it and then use like this:
+# ```
+# export PYGEOAPI_LOG_CONFIG=my-log-config.yml
+#
+# pygeoapi serve  # use it during development
+# pygeoapi serve --starlette  # use it during development (needs tweaking)
+#
+# gunicorn --log-config-dict pygeoapi.log.ENV_LOGGING_CONFIG  # use it in production
+# uvicorn --log-config ${PYGEOAPI_LOG_CONFIG}  # use it in production (needs tweaking)
+# ```
+
+version: 1
+
+disable_existing_loggers: false
+
+root:
+  level: INFO
+  handlers:
+    - console
+
+loggers:
+    gunicorn.error:
+      level: INFO
+      handlers:
+        - error_console
+      propagate: false
+      qualname: gunicorn.error
+
+    gunicorn.access:
+      level: INFO
+      handlers:
+        - console
+      propagate: false
+      qualname: gunicorn.access
+
+    pygeoapi:
+      level: WARNING
+      handlers:
+        - console
+      propagate: false
+
+    pygeoapi.admin:
+      level: DEBUG
+      handlers:
+        - console
+      propagate: false
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: generic
+    stream: ext://sys.stdout
+
+  error_console:
+    class: logging.StreamHandler
+    formatter: generic
+    stream: ext://sys.stderr
+
+formatters:
+  generic:
+    format: "%(asctime)s [%(process)d] [%(levelname)s] %(name)s %(message)s"
+    datefmt: "[%Y-%m-%d %H:%M:%S %z]"
+    class: logging.Formatter
